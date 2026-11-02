@@ -5,82 +5,80 @@
 
 /* ============================================================
    VisaDrive Design System
-   Palette derived from the VisaDrive logo:
-     - Signal Red   #D82828  (wordmark "VISA")
-     - Ink Charcoal #201820  (wordmark "DRIVE")
-     - Navy         #2B4A9B  (globe swoosh)
-   Restrained, high-contrast, white-dominant. Red is used as a
-   signal colour (CTAs, active state, brand marks) - never as a
-   background wash.
+   Premium SaaS palette: midnight navy type, deep/electric blue
+   actions and a restrained indigo accent on clean light surfaces.
+   Blue is reserved for actions, links and active states — never
+   a full-page wash.
    ============================================================ */
 
 :root {
   --radius: 0.625rem;
 
   /* --- Brand ------------------------------------------------ */
-  --brand: oklch(57.13% 0.2102 27.1);          /* #D82828 logo red */
-  --brand-strong: oklch(53.39% 0.1982 27.25);  /* #C62222 */
-  --brand-deep: oklch(47.24% 0.1756 27.27);    /* #A81B1B */
-  --brand-soft: oklch(93.7% 0.0286 17.67);     /* #FDE3E3 */
-  --brand-tint: oklch(97.05% 0.0129 17.38);    /* #FEF2F2 */
-  --brand-foreground: oklch(99% 0 0);
-  --navy: oklch(43.31% 0.1373 265.29);         /* #2B4A9B */
+  --brand: #3867f4;            /* Electric blue — links, focus, accents */
+  --brand-strong: #245bdb;     /* Deep blue — primary actions */
+  --brand-deep: #1d46b0;
+  --brand-soft: #dfe9ff;
+  --brand-tint: #f0f5ff;
+  --brand-foreground: #ffffff;
+  --navy: #101828;             /* Midnight navy — headline type */
+  --indigo: #6955e8;
 
   /* --- Surfaces --------------------------------------------- */
-  --background: oklch(100% 0 0);
-  --foreground: oklch(19.75% 0.0127 307.75);
-  --card: oklch(100% 0 0);
-  --card-foreground: oklch(19.75% 0.0127 307.75);
-  --popover: oklch(100% 0 0);
-  --popover-foreground: oklch(19.75% 0.0127 307.75);
-  --surface: oklch(98.6% 0.0015 286.38);
-  --surface-strong: oklch(96.74% 0.0013 286.38);
+  --background: #ffffff;
+  --foreground: #101828;
+  --card: #ffffff;
+  --card-foreground: #101828;
+  --popover: #ffffff;
+  --popover-foreground: #101828;
+  --surface: #f7f9fc;
+  --surface-strong: #eef2f8;
 
   /* --- Semantic --------------------------------------------- */
-  --primary: oklch(53.39% 0.1982 27.25);
-  --primary-foreground: oklch(99% 0 0);
-  --secondary: oklch(96.74% 0.0013 286.38);
-  --secondary-foreground: oklch(25.24% 0.0194 303.24);
-  --muted: oklch(96.74% 0.0013 286.38);
-  --muted-foreground: oklch(54.21% 0.0175 302.3);
-  --accent: oklch(96.74% 0.0013 286.38);
-  --accent-foreground: oklch(25.24% 0.0194 303.24);
-  --destructive: oklch(57.13% 0.2102 27.1);
-  --destructive-foreground: oklch(99% 0 0);
+  --primary: #245bdb;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2f8;
+  --secondary-foreground: #182230;
+  --muted: #eef2f8;
+  --muted-foreground: #667085;
+  --accent: #f0f5ff;
+  --accent-foreground: #245bdb;
+  --destructive: #d92d20;
+  --destructive-foreground: #ffffff;
 
-  --border: oklch(92.49% 0.007 304.24);
-  --border-strong: oklch(86.54% 0.0114 303.09);
-  --input: oklch(92.49% 0.007 304.24);
-  --ring: oklch(57.13% 0.2102 27.1);
+  --border: #e5eaf2;
+  --border-strong: #d3ddea;
+  --input: #e5eaf2;
+  --ring: #3867f4;
 
   /* --- Status ----------------------------------------------- */
-  --success: oklch(62.22% 0.1333 162.27);
-  --success-foreground: oklch(99% 0 0);
-  --success-soft: oklch(95.5% 0.03 162);
-  --warning: oklch(66.58% 0.1574 58.32);
-  --warning-foreground: oklch(99% 0 0);
-  --warning-soft: oklch(96.5% 0.035 75);
-  --info: oklch(54.61% 0.2152 262.88);
-  --info-foreground: oklch(99% 0 0);
-  --info-soft: oklch(95.5% 0.03 262);
+  --success: #039855;
+  --success-foreground: #ffffff;
+  --success-soft: #e7f6ee;
+  --warning: #dc6803;
+  --warning-foreground: #ffffff;
+  --warning-soft: #fdf2e3;
+  --info: #245bdb;
+  --info-foreground: #ffffff;
+  --info-soft: #f0f5ff;
 
   /* --- Charts ----------------------------------------------- */
-  --chart-1: oklch(57.13% 0.2102 27.1);
-  --chart-2: oklch(43.31% 0.1373 265.29);
-  --chart-3: oklch(62.22% 0.1333 162.27);
-  --chart-4: oklch(66.58% 0.1574 58.32);
-  --chart-5: oklch(54.21% 0.0175 302.3);
-  --chart-6: oklch(60% 0.14 320);
+  --chart-1: #3867f4;
+  --chart-2: #6955e8;
+  --chart-3: #039855;
+  --chart-4: #dc6803;
+  --chart-5: #667085;
+  --chart-6: #101828;
 
   /* --- Sidebar (admin shell) -------------------------------- */
-  --sidebar: oklch(19.75% 0.0127 307.75);
-  --sidebar-foreground: oklch(86.54% 0.0114 303.09);
-  --sidebar-primary: oklch(57.13% 0.2102 27.1);
-  --sidebar-primary-foreground: oklch(99% 0 0);
-  --sidebar-accent: oklch(25.24% 0.0194 303.24);
-  --sidebar-accent-foreground: oklch(97% 0 0);
-  --sidebar-border: oklch(28% 0.018 303);
-  --sidebar-ring: oklch(57.13% 0.2102 27.1);
+  --sidebar: #101828;
+  --sidebar-foreground: #d3ddea;
+  --sidebar-primary: #3867f4;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #182230;
+  --sidebar-accent-foreground: #f7f9fc;
+  --sidebar-border: #233047;
+  --sidebar-ring: #3867f4;
 }
 
 .dark {
@@ -93,14 +91,15 @@
   --surface: oklch(19.75% 0.0127 307.75);
   --surface-strong: oklch(23% 0.016 304);
 
-  --brand: oklch(64% 0.195 27.5);
-  --brand-strong: oklch(60% 0.2 27.3);
-  --brand-deep: oklch(54% 0.19 27.3);
-  --brand-soft: oklch(28% 0.07 25);
-  --brand-tint: oklch(24% 0.05 25);
+  --brand: #7ea2ff;
+  --brand-strong: #9db9ff;
+  --brand-deep: #5f86f5;
+  --brand-soft: #1d2c4d;
+  --brand-tint: #16223c;
+  --indigo: #a79bff;
 
-  --primary: oklch(62% 0.2 27.4);
-  --primary-foreground: oklch(99% 0 0);
+  --primary: #7ea2ff;
+  --primary-foreground: #0d1526;
   --secondary: oklch(25.24% 0.0194 303.24);
   --secondary-foreground: oklch(94% 0.004 303);
   --muted: oklch(25.24% 0.0194 303.24);
@@ -113,7 +112,7 @@
   --border: oklch(28% 0.018 303);
   --border-strong: oklch(35% 0.02 303);
   --input: oklch(28% 0.018 303);
-  --ring: oklch(64% 0.195 27.5);
+  --ring: #7ea2ff;
 
   --success: oklch(68% 0.13 162);
   --success-soft: oklch(26% 0.05 162);
@@ -122,8 +121,8 @@
   --info: oklch(62% 0.19 263);
   --info-soft: oklch(26% 0.06 263);
 
-  --chart-1: oklch(64% 0.195 27.5);
-  --chart-2: oklch(60% 0.14 265);
+  --chart-1: #7ea2ff;
+  --chart-2: #a79bff;
   --chart-3: oklch(68% 0.13 162);
   --chart-4: oklch(72% 0.15 62);
   --chart-5: oklch(70.28% 0.0164 302.44);
@@ -131,12 +130,12 @@
 
   --sidebar: oklch(13.5% 0.009 308);
   --sidebar-foreground: oklch(86.54% 0.0114 303.09);
-  --sidebar-primary: oklch(64% 0.195 27.5);
-  --sidebar-primary-foreground: oklch(99% 0 0);
+  --sidebar-primary: #7ea2ff;
+  --sidebar-primary-foreground: #0d1526;
   --sidebar-accent: oklch(22% 0.015 304);
   --sidebar-accent-foreground: oklch(97% 0 0);
   --sidebar-border: oklch(24% 0.016 303);
-  --sidebar-ring: oklch(64% 0.195 27.5);
+  --sidebar-ring: #7ea2ff;
 }
 
 @theme inline {
@@ -167,6 +166,7 @@
   --color-brand-tint: var(--brand-tint);
   --color-brand-foreground: var(--brand-foreground);
   --color-navy: var(--navy);
+  --color-indigo: var(--indigo);
 
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
@@ -306,5 +306,56 @@
     box-shadow:
       0 8px 16px -8px rgb(23 20 26 / 0.08),
       0 24px 56px -12px rgb(23 20 26 / 0.14);
+  }
+
+  /* Motion: short, purposeful, and disabled by the reduced-motion
+     rule in @layer base above. */
+  .animate-fade-up {
+    animation: vd-fade-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-scale-in {
+    animation: vd-scale-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-success-pop {
+    animation: vd-success-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes vd-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes vd-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes vd-success-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }

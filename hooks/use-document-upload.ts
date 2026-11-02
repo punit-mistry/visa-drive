@@ -54,10 +54,13 @@ export function useDocumentUpload({
       options: {
         documentKey: string;
         label: string;
+        applicantId?: Id<"applicants">;
         constraints?: { allowedMimeTypes?: string[]; maxSizeBytes?: number };
       },
     ) => {
-      const localId = `${file.name}-${file.size}-${Date.now()}`;
+      // The id doubles as the row's filter key in the checklist UI, so it is
+      // namespaced by document (and traveller) rather than by file alone.
+      const localId = `${options.documentKey}:${options.applicantId ?? applicantId ?? "general"}:${file.name}-${file.size}-${Date.now()}`;
 
       const check = validateFile(file, options.constraints);
       if (!check.ok) {
@@ -82,7 +85,7 @@ export function useDocumentUpload({
 
         const documentId = await attach({
           applicationId,
-          applicantId,
+          applicantId: options.applicantId ?? applicantId,
           storageId: storageId as Id<"_storage">,
           documentKey: options.documentKey,
           label: options.label,
