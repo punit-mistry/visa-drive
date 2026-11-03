@@ -10,6 +10,21 @@ still whenever the video does not play.
 Source: Pexels (commercial use permitted). Encoded from a 2560x1440 60fps
 master with the command below.
 
+## Hero stills
+
+`hero-destinations.jpg` — a traveller with luggage crossing a sunlit terminal.
+The masthead for `/destinations`, in both catalogue and search-result modes.
+`hero-services.jpg` — hands annotating an application document set. The
+masthead for `/services`.
+
+Both are 2400×1600 JPEGs from Pexels (commercial use permitted, attribution
+not required), saved locally rather than hot-linked. They sit at 60% opacity
+behind two scrims, so nothing in either frame has to be legible — the copy
+above them is what carries the page.
+
+Neither carries a logo or a recognizable face: the destinations frame is
+backlit and shot from behind, so the people in it read as silhouettes.
+
 Any clip added here is played through `components/marketing/ambient-video.tsx`,
 which declines to load it under reduced motion, on Data Saver, or on a slow
 connection, and falls back to the still on any decode error. There is no

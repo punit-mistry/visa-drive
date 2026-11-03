@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
@@ -33,6 +34,42 @@ interface DiscoveryResult extends CatalogueProduct {
     flagEmoji: string;
     countryCode: string;
   };
+}
+
+/**
+ * The masthead photograph, shared by both modes of this page so a search does
+ * not lose the atmosphere of the catalogue.
+ *
+ * It is decoration only: no alt text, held well back behind two scrims, and the
+ * copy above it sits in a `relative z-10` sibling. There is deliberately no
+ * negative z-index - inside an `isolate` parent that would paint the photo
+ * behind the section's own background and hide it.
+ */
+const MASTHEAD_IMAGE = "/media/hero-destinations.jpg";
+
+function MastheadBackdrop() {
+  return (
+    <>
+      <Image
+        src={MASTHEAD_IMAGE}
+        alt=""
+        aria-hidden
+        fill
+        priority
+        sizes="100vw"
+        quality={70}
+        className="object-cover object-[50%_38%] opacity-60"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-gradient-to-t from-ink-black via-ink-black/45 to-ink-black/10"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-gradient-to-r from-ink-black/90 via-ink-black/55 to-transparent"
+      />
+    </>
+  );
 }
 
 /**
@@ -125,8 +162,10 @@ function DiscoveryResults({
 
   return (
     <>
-      <section className="bg-ink-black">
-        <div className="container-wide pb-14 pt-10 sm:pb-16 sm:pt-14 lg:pb-24 lg:pt-20">
+      <section className="relative isolate overflow-hidden bg-ink-black">
+        <MastheadBackdrop />
+
+        <div className="container-wide relative z-10 pb-14 pt-10 sm:pb-16 sm:pt-14 lg:pb-24 lg:pt-20">
           <FadeIn>
             <p className="text-eyebrow-dark">Your search</p>
             <h1 className="display-xl mt-4 max-w-4xl text-paper">
@@ -286,8 +325,10 @@ function DestinationGrid() {
 
   return (
     <>
-      <section className="bg-ink-black">
-        <div className="container-wide pb-14 pt-10 sm:pb-16 sm:pt-14 lg:pb-24 lg:pt-20">
+      <section className="relative isolate overflow-hidden bg-ink-black">
+        <MastheadBackdrop />
+
+        <div className="container-wide relative z-10 pb-14 pt-10 sm:pb-16 sm:pt-14 lg:pb-24 lg:pt-20">
           <FadeIn className="grid gap-10 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-8">
               <p className="text-eyebrow-dark">Destinations</p>

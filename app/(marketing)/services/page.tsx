@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 
 import { FaqSection } from "@/components/marketing/faq-section";
 import { FinalCta } from "@/components/marketing/final-cta";
@@ -16,8 +17,29 @@ export const metadata: Metadata = {
 export default function ServicesPage() {
   return (
     <>
-      <section className="bg-ink-black py-20 text-paper sm:py-24 lg:py-32">
-        <div className="container-wide">
+      <section className="relative isolate overflow-hidden bg-ink-black py-20 text-paper sm:py-24 lg:py-32">
+        {/* Atmosphere only: reviewing the document set is the work this page
+            sells, and the photograph carries no information the copy does not. */}
+        <Image
+          src="/media/hero-services.jpg"
+          alt=""
+          aria-hidden
+          fill
+          priority
+          sizes="100vw"
+          quality={70}
+          className="object-cover object-center opacity-60"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-t from-ink-black via-ink-black/45 to-ink-black/10"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-r from-ink-black/90 via-ink-black/55 to-transparent"
+        />
+
+        <div className="container-wide relative z-10">
           <FadeIn className="grid gap-10 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-8">
               <p className="text-eyebrow-dark">Services</p>
