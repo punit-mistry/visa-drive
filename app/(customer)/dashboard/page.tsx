@@ -8,7 +8,6 @@ import {
   CreditCard,
   FileText,
   PenLine,
-  PlusCircle,
   Wallet,
 } from "lucide-react";
 
@@ -60,14 +59,6 @@ export default function DashboardPage() {
       <PageHeader
         title={`Welcome back, ${firstName}`}
         description="Everything on your visa applications, in one place."
-        actions={
-          <Button asChild>
-            <Link href="/apply">
-              <PlusCircle className="size-4" aria-hidden />
-              New application
-            </Link>
-          </Button>
-        }
       />
 
       {/* A saved draft is the single highest-value thing on this page: it is

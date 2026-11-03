@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePaginatedQuery } from "convex/react";
-import { FileText, PlusCircle } from "lucide-react";
+import { FileText } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -26,14 +26,6 @@ export default function ApplicationsPage() {
       <PageHeader
         title="Applications"
         description="Every draft and submitted visa application on your account."
-        actions={
-          <Button asChild>
-            <Link href="/apply">
-              <PlusCircle className="size-4" aria-hidden />
-              New application
-            </Link>
-          </Button>
-        }
       />
 
       {status === "LoadingFirstPage" ? (
