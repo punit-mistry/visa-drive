@@ -44,8 +44,17 @@ crashing.
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
    CLERK_SECRET_KEY=sk_test_...
    ```
-3. Create a **JWT template named exactly `convex`**. Copy its Issuer URL and
-   set it on the Convex deployment (not in `.env.local`):
+3. Create a **JWT template named exactly `convex`**. Its claims must include
+   the user's identity, or new accounts cannot be provisioned from the token:
+   ```json
+   {
+     "aud": "convex",
+     "email": "{{user.primary_email_address}}",
+     "name": "{{user.full_name}}",
+     "picture": "{{user.image_url}}"
+   }
+   ```
+   Copy its Issuer URL and set it on the Convex deployment (not in `.env.local`):
    ```bash
    npx convex env set CLERK_JWT_ISSUER_DOMAIN https://your-app.clerk.accounts.dev
    ```
@@ -53,7 +62,9 @@ crashing.
    fail.
 4. Add a webhook pointing at `<your-convex-site-url>/clerk-webhook` for
    `user.created`, `user.updated`, `user.deleted`, and put its signing secret
-   in `CLERK_WEBHOOK_SECRET`. This is what creates the Convex `users` row.
+   in `CLERK_WEBHOOK_SECRET`. This is the normal way the Convex `users` row is
+   created. If it is missing or delayed, `users.syncFromClerk` creates the row
+   from the signed JWT on first load instead.
 
 **Everything else is optional** and degrades cleanly:
 

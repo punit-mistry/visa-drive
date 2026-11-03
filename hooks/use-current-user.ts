@@ -32,31 +32,47 @@ export function useCurrentUser() {
   const syncProfile = useMutation(api.users.syncFromClerk);
   const { isAuthenticated } = useConvexAuth();
   const [profileIssue, setProfileIssue] = useState<
-    "incomplete" | "deleted" | null
+    "incomplete" | "deleted" | "error" | null
   >(null);
 
   useEffect(() => {
     // `null` (not `undefined`) means the query has answered and there is no
     // row. Undefined is still loading, and an object means we are done.
-    if (!isAuthenticated || user !== null) return;
+    if (user !== null) return;
+
+    // The portal must never spin forever. If nothing has resolved in a few
+    // seconds - the deployment is missing `syncFromClerk`, the Clerk JWT
+    // template is wrong, the network is wedged - say so and offer a retry
+    // instead of an endless "Setting up your account…".
+    const stall = setTimeout(() => {
+      setProfileIssue((current) => current ?? "error");
+    }, 10_000);
+
+    if (!isAuthenticated) {
+      return () => clearTimeout(stall);
+    }
 
     let cancelled = false;
     let attempts = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let retry: ReturnType<typeof setTimeout> | undefined;
 
     const run = async () => {
       attempts += 1;
       try {
         const result = await syncProfile({});
         if (cancelled) return;
-        // Neither of these can be fixed by retrying: the token has no email
-        // to key a row on, or the account was deliberately deleted. Surface
-        // it so the UI can ask a human to help instead of spinning forever.
+        // These cannot be fixed by retrying: the token carries no email to
+        // key a row on, or the account was deliberately deleted.
         setProfileIssue(result.status === "ready" ? null : result.status);
       } catch (error) {
         console.error("[visadrive] could not set up the Convex profile", error);
-        if (!cancelled && attempts < 3) {
-          timer = setTimeout(run, 1500 * attempts);
+        if (cancelled) return;
+        if (attempts < 3) {
+          retry = setTimeout(run, 1500 * attempts);
+        } else {
+          // Most often a deployment that has not received the new Convex
+          // functions yet. Stop pretending it is still in progress.
+          setProfileIssue((current) => current ?? "error");
         }
       }
     };
@@ -65,7 +81,8 @@ export function useCurrentUser() {
 
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
+      clearTimeout(stall);
+      if (retry) clearTimeout(retry);
     };
   }, [isAuthenticated, user, syncProfile]);
 

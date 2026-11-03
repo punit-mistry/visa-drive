@@ -117,7 +117,8 @@ export default function RootLayout({
       steps={[
         "Create a free application at dashboard.clerk.com.",
         "Copy the publishable and secret keys into .env.local.",
-        "Add a JWT template named `convex`, then run: npx convex env set CLERK_JWT_ISSUER_DOMAIN <issuer-url>",
+        "Add a JWT template named `convex` with claims for email, name and picture (see README).",
+        "Run: npx convex env set CLERK_JWT_ISSUER_DOMAIN <issuer-url>",
         "Restart `npm run dev`.",
       ]}
     />

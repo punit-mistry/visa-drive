@@ -71,7 +71,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
           profileIssue === "deleted" ? (
             <AccountBlockedState reason="deleted" />
           ) : (
-            <AccountSetupState stalled={profileIssue === "incomplete"} />
+            <AccountSetupState stalled={profileIssue !== null} />
           )
         ) : isSuspended ? (
           <AccountBlockedState reason="suspended" />

@@ -123,7 +123,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           profileIssue === "deleted" ? (
             <AccountBlockedState reason="deleted" />
           ) : (
-            <AccountSetupState stalled={profileIssue === "incomplete"} />
+            <AccountSetupState stalled={profileIssue !== null} />
           )
         ) : !isStaff ? (
           <div className="container-page flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center text-center">

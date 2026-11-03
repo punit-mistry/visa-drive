@@ -38,6 +38,15 @@ export function AccountSetupState({ stalled = false }: { stalled?: boolean }) {
           <Link href="/contact">Contact support</Link>
         </Button>
       </div>
+
+      {process.env.NODE_ENV === "development" && (
+        <p className="mt-6 max-w-md rounded-lg border border-dashed border-border bg-surface px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+          Dev: this is almost always a stale Convex deployment. Run{" "}
+          <span className="font-semibold text-foreground">npx convex dev</span>{" "}
+          (or <span className="font-semibold text-foreground">npx convex deploy</span>
+          ) so `users.syncFromClerk` exists, then refresh.
+        </p>
+      )}
     </div>
   );
 }
