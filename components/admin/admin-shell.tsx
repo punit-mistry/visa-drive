@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { Logo } from "@/components/shared/logo";
+import { AccountBlockedState, AccountSetupState } from "@/components/shared/account-state";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -75,7 +76,8 @@ function isActive(pathname: string, href: string) {
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isLoading, isStaff, canAny } = useCurrentUser();
+  const { user, isLoading, isStaff, isSuspended, canAny, profileIssue } =
+    useCurrentUser();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navGroupsWithItems = NAV_GROUPS.map((group) => {
@@ -115,7 +117,15 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </Show>
 
       <Show when="signed-in">
-        {!isStaff ? (
+        {isSuspended ? (
+          <AccountBlockedState reason="suspended" />
+        ) : !user ? (
+          profileIssue === "deleted" ? (
+            <AccountBlockedState reason="deleted" />
+          ) : (
+            <AccountSetupState stalled={profileIssue === "incomplete"} />
+          )
+        ) : !isStaff ? (
           <div className="container-page flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center text-center">
             <h1 className="text-2xl font-semibold tracking-tight">Not authorised</h1>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">

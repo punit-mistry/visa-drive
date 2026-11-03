@@ -785,6 +785,101 @@ export const deactivateStaff = mutation({
  * for email / name / avatar / verification only. Role and status live in
  * Convex, so an update event never downgrades a role an admin set here.
  */
+interface ClerkIdentityFields {
+  clerkId: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+  phone?: string;
+  emailVerified?: boolean;
+}
+
+/**
+ * The one write path from Clerk identity into the `users` table.
+ *
+ * Shared by the webhook and by `syncFromClerk` so a delayed webhook and a
+ * self-heal cannot diverge: both link an invited placeholder by email, both
+ * respect a role an admin set, both revive a soft-deleted row.
+ */
+async function applyClerkIdentity(
+  ctx: MutationCtx,
+  args: ClerkIdentityFields,
+): Promise<Id<"users">> {
+  const email = normaliseEmail(args.email);
+  const fullName = args.fullName.trim() || email.split("@")[0];
+
+  const identityPatch = {
+    email,
+    fullName,
+    avatarUrl: args.avatarUrl,
+    emailVerified: args.emailVerified ?? false,
+    ...(args.phone ? { phone: args.phone } : {}),
+  };
+
+  const byClerkId = await ctx.db
+    .query("users")
+    .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+    .unique();
+
+  if (byClerkId) {
+    await ctx.db.patch(byClerkId._id, {
+      ...identityPatch,
+      // A Clerk account re-created under the same id un-deletes the profile;
+      // a suspension set in Convex is deliberately left alone.
+      ...(byClerkId.status === "deleted" ? { status: "active" as const } : {}),
+    });
+    return byClerkId._id;
+  }
+
+  // An invited colleague signing in for the first time: link the placeholder
+  // row (which already carries the role we granted) to their Clerk account.
+  const byEmail = await ctx.db
+    .query("users")
+    .withIndex("by_email", (q) => q.eq("email", email))
+    .first();
+
+  if (byEmail) {
+    await ctx.db.patch(byEmail._id, {
+      ...identityPatch,
+      clerkId: args.clerkId,
+      ...(byEmail.status === "deleted" ? { status: "active" as const } : {}),
+    });
+    return byEmail._id;
+  }
+
+  // Bootstrap: the first operator is named by a deployment env var so a
+  // fresh deployment has somebody who can grant roles.
+  const seedEmail = normaliseEmail(process.env.SEED_SUPER_ADMIN_EMAIL ?? "");
+  const isSeedSuperAdmin = seedEmail.length > 0 && seedEmail === email;
+
+  const userId = await ctx.db.insert("users", {
+    clerkId: args.clerkId,
+    ...identityPatch,
+    role: isSeedSuperAdmin ? "super_admin" : "customer",
+    status: "active",
+    applicationCount: 0,
+    createdAt: Date.now(),
+  });
+
+  if (isSeedSuperAdmin) {
+    await ensureStaffProfile(ctx, userId, {
+      designation: "Founder",
+      department: "Management",
+    });
+  } else {
+    await ctx.scheduler.runAfter(0, notificationsDispatch, {
+      userId,
+      type: NOTIFICATION_TYPES.USER_REGISTERED,
+      title: "Welcome to VisaDrive",
+      body: "Your account is ready. Pick a destination to start your visa application.",
+      link: "/destinations",
+      dedupeKey: dedupeKeys.userRegistered(userId),
+    });
+  }
+
+  return userId;
+}
+
 export const upsertFromClerk = internalMutation({
   args: {
     clerkId: v.string(),
@@ -795,80 +890,68 @@ export const upsertFromClerk = internalMutation({
     emailVerified: v.optional(v.boolean()),
   },
   returns: v.id("users"),
-  handler: async (ctx, args) => {
-    const email = normaliseEmail(args.email);
-    const fullName = args.fullName.trim() || email.split("@")[0];
+  handler: async (ctx, args) => await applyClerkIdentity(ctx, args),
+});
 
-    const identityPatch = {
-      email,
-      fullName,
-      avatarUrl: args.avatarUrl,
-      emailVerified: args.emailVerified ?? false,
-      ...(args.phone ? { phone: args.phone } : {}),
-    };
+/**
+ * Self-heal the profile from the caller's own Clerk identity.
+ *
+ * Clerk's `user.created` webhook is normally what creates the row, but it can
+ * be delayed, retried, or missing in a fresh deployment - and until it lands
+ * every protected query fails with `NO_PROFILE`. The signed JWT already proves
+ * who the caller is, so they can be created here instead of staring at an
+ * error.
+ *
+ * Identity fields come from the verified token, never from the client: an
+ * attacker cannot claim an arbitrary email and inherit an invited staff role.
+ * Returns `null` when the token carries no email (nothing safe to key a row
+ * on) - the UI then keeps showing its "setting up" state.
+ */
+export const syncFromClerk = mutation({
+  args: {},
+  returns: v.object({
+    status: v.union(
+      v.literal("ready"),
+      v.literal("incomplete"),
+      v.literal("deleted"),
+    ),
+    userId: v.optional(v.id("users")),
+  }),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { status: "incomplete" as const };
 
-    const byClerkId = await ctx.db
+    const existing = await ctx.db
       .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
       .unique();
 
-    if (byClerkId) {
-      await ctx.db.patch(byClerkId._id, {
-        ...identityPatch,
-        // A Clerk account re-created under the same id un-deletes the profile;
-        // a suspension set in Convex is deliberately left alone.
-        ...(byClerkId.status === "deleted" ? { status: "active" as const } : {}),
-      });
-      return byClerkId._id;
+    if (existing) {
+      if (existing.status === "deleted") return { status: "deleted" as const };
+      return { status: "ready" as const, userId: existing._id };
     }
 
-    // An invited colleague signing in for the first time: link the placeholder
-    // row (which already carries the role we granted) to their Clerk account.
-    const byEmail = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
-      .first();
+    const email = identity.email?.trim().toLowerCase();
+    if (!email) return { status: "incomplete" as const };
 
-    if (byEmail) {
-      await ctx.db.patch(byEmail._id, {
-        ...identityPatch,
-        clerkId: args.clerkId,
-        ...(byEmail.status === "deleted" ? { status: "active" as const } : {}),
-      });
-      return byEmail._id;
-    }
+    const fullName =
+      identity.name?.trim() ||
+      [identity.givenName, identity.familyName]
+        .filter((part): part is string => !!part?.trim())
+        .join(" ")
+        .trim() ||
+      email.split("@")[0];
 
-    // Bootstrap: the first operator is named by a deployment env var so a
-    // fresh deployment has somebody who can grant roles.
-    const seedEmail = normaliseEmail(process.env.SEED_SUPER_ADMIN_EMAIL ?? "");
-    const isSeedSuperAdmin = seedEmail.length > 0 && seedEmail === email;
-
-    const userId = await ctx.db.insert("users", {
-      clerkId: args.clerkId,
-      ...identityPatch,
-      role: isSeedSuperAdmin ? "super_admin" : "customer",
-      status: "active",
-      applicationCount: 0,
-      createdAt: Date.now(),
+    const userId = await applyClerkIdentity(ctx, {
+      clerkId: identity.subject,
+      email,
+      fullName,
+      avatarUrl: identity.pictureUrl,
+      phone: identity.phoneNumber,
+      emailVerified: identity.emailVerified ?? false,
     });
 
-    if (isSeedSuperAdmin) {
-      await ensureStaffProfile(ctx, userId, {
-        designation: "Founder",
-        department: "Management",
-      });
-    } else {
-      await ctx.scheduler.runAfter(0, notificationsDispatch, {
-        userId,
-        type: NOTIFICATION_TYPES.USER_REGISTERED,
-        title: "Welcome to VisaDrive",
-        body: "Your account is ready. Pick a destination to start your visa application.",
-        link: "/destinations",
-        dedupeKey: dedupeKeys.userRegistered(userId),
-      });
-    }
-
-    return userId;
+    return { status: "ready" as const, userId };
   },
 });
 

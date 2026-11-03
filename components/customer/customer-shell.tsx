@@ -12,8 +12,10 @@ import {
   User,
 } from "lucide-react";
 
+import { AccountBlockedState, AccountSetupState } from "@/components/shared/account-state";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -30,9 +32,14 @@ const NAV_ITEMS = [
  * Desktop gets a quiet left rail; phones get a scrollable tab strip pinned
  * under the header instead, because a stacked five-item list pushed the
  * actual page content below the fold on every single route.
+ *
+ * The page only mounts once the Convex `users` row exists: until then every
+ * protected query throws `NO_PROFILE`. `useCurrentUser` creates that row from
+ * the signed JWT, so the gap closes without the visitor seeing an error.
  */
 export function CustomerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, isLoading, isSuspended, profileIssue } = useCurrentUser();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === href;
@@ -60,63 +67,43 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
       </Show>
 
       <Show when="signed-in">
-        <div className="min-h-screen bg-surface">
-          <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
-            <div className="container-page flex h-16 items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Logo size="md" href="/" />
-                <span className="hidden rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:inline">
-                  My portal
-                </span>
+        {isLoading || !user ? (
+          profileIssue === "deleted" ? (
+            <AccountBlockedState reason="deleted" />
+          ) : (
+            <AccountSetupState stalled={profileIssue === "incomplete"} />
+          )
+        ) : isSuspended ? (
+          <AccountBlockedState reason="suspended" />
+        ) : (
+          <div className="min-h-screen bg-surface">
+            <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
+              <div className="container-page flex h-16 items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Logo size="md" href="/" />
+                  <span className="hidden rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:inline">
+                    My portal
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button asChild size="sm">
+                    <Link href="/apply">
+                      <PlusCircle className="size-4" aria-hidden />
+                      <span className="hidden sm:inline">New application</span>
+                      <span className="sm:hidden">Apply</span>
+                    </Link>
+                  </Button>
+                  <UserButton
+                    appearance={{ elements: { avatarBox: "size-8" } }}
+                    userProfileUrl="/dashboard/profile"
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button asChild size="sm">
-                  <Link href="/apply">
-                    <PlusCircle className="size-4" aria-hidden />
-                    <span className="hidden sm:inline">New application</span>
-                    <span className="sm:hidden">Apply</span>
-                  </Link>
-                </Button>
-                <UserButton
-                  appearance={{ elements: { avatarBox: "size-8" } }}
-                  userProfileUrl="/dashboard/profile"
-                />
-              </div>
-            </div>
 
-            {/* Phone navigation: one horizontal strip, never a stacked list. */}
-            <nav
-              aria-label="Customer portal"
-              className="scrollbar-thin container-page flex gap-1 overflow-x-auto pb-2 lg:hidden"
-            >
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-brand",
-                      active
-                        ? "bg-brand-tint text-brand-deep"
-                        : "text-muted-foreground hover:bg-surface hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="size-4" aria-hidden />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </header>
-
-          <div className="container-page grid gap-8 py-6 lg:grid-cols-[216px_minmax(0,1fr)] lg:py-8">
-            <aside className="hidden lg:block">
+              {/* Phone navigation: one horizontal strip, never a stacked list. */}
               <nav
                 aria-label="Customer portal"
-                className="sticky top-24 flex flex-col gap-0.5"
+                className="scrollbar-thin container-page flex gap-1 overflow-x-auto pb-2 lg:hidden"
               >
                 {NAV_ITEMS.map((item) => {
                   const Icon = item.icon;
@@ -127,31 +114,61 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
                       href={item.href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-brand",
+                        "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-brand",
                         active
                           ? "bg-brand-tint text-brand-deep"
-                          : "text-muted-foreground hover:bg-background hover:text-foreground",
+                          : "text-muted-foreground hover:bg-surface hover:text-foreground",
                       )}
                     >
-                      <Icon
-                        className={cn(
-                          "size-4 transition-colors",
-                          active
-                            ? "text-brand"
-                            : "text-muted-foreground group-hover:text-foreground",
-                        )}
-                        aria-hidden
-                      />
+                      <Icon className="size-4" aria-hidden />
                       {item.label}
                     </Link>
                   );
                 })}
               </nav>
-            </aside>
+            </header>
 
-            <main className="min-w-0">{children}</main>
+            <div className="container-page grid gap-8 py-6 lg:grid-cols-[216px_minmax(0,1fr)] lg:py-8">
+              <aside className="hidden lg:block">
+                <nav
+                  aria-label="Customer portal"
+                  className="sticky top-24 flex flex-col gap-0.5"
+                >
+                  {NAV_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-brand",
+                          active
+                            ? "bg-brand-tint text-brand-deep"
+                            : "text-muted-foreground hover:bg-background hover:text-foreground",
+                        )}
+                      >
+                        <Icon
+                          className={cn(
+                            "size-4 transition-colors",
+                            active
+                              ? "text-brand"
+                              : "text-muted-foreground group-hover:text-foreground",
+                          )}
+                          aria-hidden
+                        />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </aside>
+
+              <main className="min-w-0">{children}</main>
+            </div>
           </div>
-        </div>
+        )}
       </Show>
     </>
   );
