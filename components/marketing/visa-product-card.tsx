@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Clock, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, TriangleAlert } from "lucide-react";
 
 import {
   categoryLabel,
@@ -18,12 +18,14 @@ import { formatMoney } from "@/lib/helpers/pricing";
 import { cn } from "@/lib/utils";
 
 /**
- * One bookable visa.
+ * One bookable visa, set as a catalogue entry rather than a product tile.
  *
- * Price, processing time, validity and stay length are each printed only when
- * the catalogue holds a real value for them. A product whose fees have not
- * been verified carries the "Sample data" badge next to its price, which is
- * the figure most likely to be mistaken for official.
+ * The serif name leads, a hairline-ruled spec sheet follows, and the price
+ * closes the card in the same numeral face the rest of the publication uses
+ * for figures. Each spec row prints only when the catalogue holds a real
+ * value for it, and a product whose fees have not been verified carries the
+ * "Sample data" badge beside its price — the figure most likely to be
+ * mistaken for official.
  */
 export function VisaProductCard({
   product,
@@ -50,63 +52,74 @@ export function VisaProductCard({
   const entry = ENTRY_TYPE_LABELS[product.entryType];
   const promoActive = hasActivePromo(product, effectiveNow);
 
+  const specs: Array<{ label: string; value: string }> = [];
+  if (processing) specs.push({ label: "Processing", value: processing });
+  if (entry && entry !== ENTRY_TYPE_LABELS.not_applicable) {
+    specs.push({ label: "Entry", value: entry });
+  }
+  if (typeof product.validityDays === "number" && product.validityDays > 0) {
+    specs.push({ label: "Validity", value: `${product.validityDays} days` });
+  }
+  if (typeof product.maxStayDays === "number" && product.maxStayDays > 0) {
+    specs.push({ label: "Stay up to", value: `${product.maxStayDays} days` });
+  }
+
   return (
     <article
       className={cn(
-        "group relative flex h-full flex-col rounded-3xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-0.5 hover:elev-lg",
+        "group relative flex h-full flex-col rounded-2xl border border-border bg-card p-6 transition-all duration-500 ease-out lg:p-7",
+        "hover:-translate-y-0.5 hover:border-foreground/25 hover:elev-lg",
+        // Hover must never be the only cue: keyboard focus lights the whole
+        // card, not just the link text inside it.
+        "has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-paper",
         className,
       )}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="text-eyebrow flex items-center gap-2.5">
           {categoryLabel(product.category)}
-        </span>
-        {product.visaType && (
-          <span className="rounded-full border border-brand-soft bg-brand-tint px-2.5 py-1 text-xs font-medium text-brand">
-            {product.visaType}
+          {product.visaType && (
+            <>
+              <span aria-hidden className="size-1 rounded-full bg-brand" />
+              {product.visaType}
+            </>
+          )}
+        </p>
+        {product.promoLabel && promoActive && (
+          <span className="rounded-full border border-success/25 bg-success-soft px-2.5 py-1 text-xs font-medium text-success">
+            {product.promoLabel}
           </span>
         )}
-        {product.promoLabel && promoActive && (
-            <span className="rounded-full border border-success/25 bg-success-soft px-2.5 py-1 text-xs font-medium text-success">
-              {product.promoLabel}
-            </span>
-          )}
       </div>
 
-      <h3 className="mt-4 text-lg font-semibold">
+      <h3 className="display-md mt-5 line-clamp-3 text-balance text-foreground">
         <Link
           href={`/destinations/${product.destinationSlug}/${product.slug}`}
-          className="rounded-sm after:absolute after:inset-0 after:content-[''] focus-brand"
+          className="outline-none after:absolute after:inset-0 after:content-['']"
         >
           {product.name}
         </Link>
       </h3>
 
-      <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
         {product.shortDescription}
       </p>
 
-      <dl className="mt-5 space-y-2 text-sm">
-        {processing && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="size-3.5 shrink-0" aria-hidden />
-            <dt className="sr-only">Processing time</dt>
-            <dd>{processing}</dd>
-          </div>
-        )}
-        {entry && entry !== ENTRY_TYPE_LABELS.not_applicable && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <dt className="sr-only">Entry type</dt>
-            <dd>{entry}</dd>
-          </div>
-        )}
-        {typeof product.maxStayDays === "number" && product.maxStayDays > 0 && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <dt className="sr-only">Maximum stay</dt>
-            <dd>Stay up to {product.maxStayDays} days</dd>
-          </div>
-        )}
-      </dl>
+      {specs.length > 0 && (
+        <dl className="mt-6 divide-y divide-border border-y border-border text-sm">
+          {specs.map((spec) => (
+            <div
+              key={spec.label}
+              className="flex items-baseline justify-between gap-4 py-2.5"
+            >
+              <dt className="text-muted-foreground">{spec.label}</dt>
+              <dd className="text-right font-medium text-foreground">
+                {spec.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {meetsTravelDate === false && processing && (
         <p className="mt-4 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-xs leading-relaxed text-warning">
@@ -116,13 +129,13 @@ export function VisaProductCard({
         </p>
       )}
 
-      <div className="mt-auto flex flex-wrap items-end justify-between gap-3 border-t border-border pt-5">
-        <div>
+      <div className="mt-auto flex items-end justify-between gap-4 pt-6">
+        <div className="min-w-0">
           {price !== null ? (
             <>
               <p className="text-eyebrow">From</p>
-              <p className="mt-1 flex items-baseline gap-2">
-                <span className="text-xl font-semibold text-foreground">
+              <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2.5">
+                <span className="numeral text-3xl leading-none text-foreground">
                   {formatMoney(price, product.currency, "en-IN", {
                     hideDecimals: true,
                   })}
@@ -136,7 +149,7 @@ export function VisaProductCard({
                 )}
               </p>
               {product.isDemoContent && (
-                <DemoContentBadge className="relative z-10 mt-2" />
+                <DemoContentBadge className="relative z-10 mt-2.5" />
               )}
             </>
           ) : (
@@ -149,13 +162,12 @@ export function VisaProductCard({
           )}
         </div>
 
-        <p className="inline-flex items-center gap-1.5 text-sm font-medium text-brand">
-          View details
-          <ArrowRight
-            className="size-4 transition-transform duration-300 group-hover:translate-x-0.5"
-            aria-hidden
-          />
-        </p>
+        <span
+          aria-hidden
+          className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-foreground transition-all duration-500 group-hover:border-brand group-hover:bg-brand group-hover:text-brand-foreground"
+        >
+          <ArrowUpRight className="size-4 transition-transform duration-500 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+        </span>
       </div>
     </article>
   );

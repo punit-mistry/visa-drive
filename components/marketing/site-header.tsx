@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Show, UserButton } from "@clerk/nextjs";
 import { Menu, Phone } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { MARKETING_NAV } from "@/lib/constants/site";
 import { phoneDigits } from "@/lib/helpers/format";
@@ -52,6 +54,39 @@ export function SiteHeader() {
   /** True while the bar is floating over the hero photograph. */
   const onDark = hasCinematicHero && !scrolled;
 
+  const reduceMotion = useReducedMotion();
+
+  // The resting bar has to line its logo up with the page content beneath it,
+  // and that content sits inside `.container-wide`. Since the padding is now
+  // animated it cannot come from responsive classes, so the breakpoints are
+  // read here instead — these numbers mirror `.container-wide` in globals.css
+  // and have to move with it.
+  const isSmUp = useMediaQuery("(min-width: 640px)");
+  const isLgUp = useMediaQuery("(min-width: 1024px)");
+  const isXlUp = useMediaQuery("(min-width: 1280px)");
+  const is2XlUp = useMediaQuery("(min-width: 1536px)");
+
+  const restingGutter = is2XlUp
+    ? 96
+    : isXlUp
+      ? 64
+      : isLgUp
+        ? 48
+        : isSmUp
+          ? 32
+          : 20;
+  const pillGutter = isSmUp ? 28 : 20;
+
+  // One spring drives every dimension that changes, so the bar resolves as a
+  // single object settling rather than four CSS curves finishing at slightly
+  // different moments. A spring is the whole difference in feel here: eased
+  // keyframes on layout properties always read as mechanical.
+  const spring = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 240, damping: 30, mass: 0.85 };
+
+  const gutter = scrolled ? (isSmUp ? 20 : 12) : 0;
+
   // A drawer left open across a navigation traps the visitor on the new page.
   // Keying the open flag to the pathname closes it automatically on navigation
   // without an effect that sets state after every route change.
@@ -61,28 +96,64 @@ export function SiteHeader() {
     pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header
-      className={cn(
-        "top-0 z-50 w-full transition-[background-color,border-color,backdrop-filter] duration-500",
-        // Fixed only where there is a dark hero to float over. Everywhere
-        // else it is sticky, so it occupies flow and no page has to
-        // compensate with a magic top padding.
-        hasCinematicHero ? "fixed" : "sticky",
-        onDark
-          ? "border-b border-transparent bg-transparent"
-          : hasCinematicHero
-            ? "border-b border-white/10 bg-ink-black/80 backdrop-blur-md"
-            : "border-b border-border bg-background/95 backdrop-blur-sm",
-      )}
-    >
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:elev-md"
+    <>
+      <motion.header
+        animate={{ paddingLeft: gutter, paddingRight: gutter, paddingTop: gutter }}
+        transition={spring}
+        className={cn(
+          "inset-x-0 top-0 z-50",
+          hasCinematicHero ? "fixed" : "sticky",
+        )}
       >
-        Skip to content
-      </a>
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:elev-md"
+        >
+          Skip to content
+        </a>
 
-      <div className="container-wide flex h-20 items-center justify-between gap-4">
+        {/* At the top the bar spans the viewport edge to edge, the way it
+            always has. Once the page moves it detaches into a floating pill —
+            so the chrome stops being a lid on the page and starts being an
+            object on top of it. */}
+        <motion.div
+          animate={{
+            height: scrolled ? 64 : 80,
+            borderRadius: scrolled ? 999 : 0,
+            // 1760 is `.container-wide`'s ceiling: at rest the bar has to
+            // sit on exactly the same measure as the page under it.
+            maxWidth: scrolled ? 1600 : 1760,
+            paddingLeft: scrolled ? pillGutter : restingGutter,
+            paddingRight: scrolled ? pillGutter : restingGutter,
+          }}
+          transition={spring}
+          className={cn(
+            // Colour, shadow and blur stay on CSS transitions: they are paint,
+            // they are cheap, and they do not need physics. Only the
+            // dimensions ride the spring.
+            "relative mx-auto flex w-full items-center justify-between gap-4 border",
+            "transition-[background-color,border-color,box-shadow] duration-500 ease-out motion-reduce:transition-none",
+            scrolled && "elev-lg",
+            onDark
+              ? "border-transparent bg-transparent"
+              : hasCinematicHero
+                ? "border-white/12 bg-ink-black/75 backdrop-blur-xl"
+                : scrolled
+                  ? "border-border bg-background/85 backdrop-blur-xl"
+                  : "border-transparent bg-background/95 backdrop-blur-sm",
+          )}
+        >
+          {/* The resting state's bottom rule. Kept as its own element so the
+              bar can carry a 1px border on all four sides the whole time and
+              only the colour has to move. */}
+          <span
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-x-0 -bottom-px h-px transition-opacity duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+              onDark ? "bg-transparent" : hasCinematicHero ? "bg-white/12" : "bg-border",
+              scrolled ? "opacity-0" : "opacity-100",
+            )}
+          />
         <div className="flex items-center gap-10">
           <Logo size="md" onDark={hasCinematicHero} />
 
@@ -249,7 +320,8 @@ export function SiteHeader() {
             </SheetContent>
           </Sheet>
         </div>
-      </div>
-    </header>
+        </motion.div>
+      </motion.header>
+    </>
   );
 }

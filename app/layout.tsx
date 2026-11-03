@@ -65,10 +65,6 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  icons: {
-    icon: "/brand/visadrive-logo-sm.png",
-    apple: "/brand/visadrive-logo-sm.png",
-  },
 };
 
 export const viewport: Viewport = {

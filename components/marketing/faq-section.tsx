@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Reveal } from "@/components/marketing/reveal";
 import { Section, SectionIntro } from "@/components/marketing/section";
+import type { SectionTone } from "@/components/marketing/section";
 import {
   Accordion,
   AccordionContent,
@@ -43,7 +44,7 @@ export function FaqSection({
   title?: string;
   eyebrow?: string;
   description?: string;
-  tone?: "default" | "surface";
+  tone?: SectionTone;
   withContactCta?: boolean;
 }) {
   // The ids arrive as plain strings from a parent query result; Convex brands
@@ -61,7 +62,7 @@ export function FaqSection({
   if (faqs !== undefined && faqs.length === 0) return null;
 
   return (
-    <Section tone={tone}>
+    <Section tone={tone} width="wide">
       <div className="grid gap-10 lg:grid-cols-12 lg:gap-16">
         <div className="lg:col-span-4">
           <SectionIntro

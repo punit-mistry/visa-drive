@@ -4,6 +4,7 @@ import { FileWarning } from "lucide-react";
 
 import { ContactDetails } from "@/components/marketing/contact-details";
 import { Crumbs } from "@/components/marketing/crumbs";
+import { FadeIn } from "@/components/marketing/reveal";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 
 export interface LegalSection {
@@ -26,6 +27,11 @@ export interface LegalSection {
  * `lib/constants/site.ts`. Anything the client has not written yet is shown
  * as an explicit "to be completed" block, so nobody mistakes a gap for a
  * policy.
+ *
+ * This file only styles the container. The editorial masthead borrows the
+ * homepage's serif display type, but the body is deliberately plain: a
+ * ~68-character measure, generous leading and hairline rules, because people
+ * read these pages to understand a commitment, not to be impressed.
  */
 export function LegalDocument({
   title,
@@ -42,21 +48,37 @@ export function LegalDocument({
 }) {
   const settings = useSiteSettings();
   const outstanding = sections.filter((section) => section.placeholder).length;
+  const contactNumber = String(sections.length + 1).padStart(2, "0");
 
   return (
     <>
-      <section className="border-b border-border bg-background">
-        <div className="container-page py-10 sm:py-14">
-          <Crumbs items={[{ label: crumbLabel }]} />
-          <h1 className="mt-8 max-w-3xl text-4xl sm:text-5xl">{title}</h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            {intro}
-          </p>
-          {lastUpdated && (
-            <p className="mt-5 text-sm text-muted-foreground">
-              Last updated {lastUpdated}
+      {/* The header is fixed, so the masthead carries its own clearance. */}
+      <section className="border-b border-border bg-paper pb-12 pt-14 sm:pb-16 sm:pt-16 lg:pb-20 lg:pt-20">
+        <div className="container-page">
+          <FadeIn>
+            <Crumbs items={[{ label: crumbLabel }]} />
+            <p className="text-eyebrow mt-10 sm:mt-12">Legal</p>
+            <h1 className="display-xl mt-4 max-w-4xl text-foreground">
+              {title}
+            </h1>
+          </FadeIn>
+
+          <FadeIn
+            delay={0.08}
+            className="mt-8 grid gap-6 border-t border-border pt-6 lg:mt-12 lg:grid-cols-12 lg:gap-14"
+          >
+            <p className="max-w-[62ch] text-base leading-relaxed text-muted-foreground sm:text-lg lg:col-span-8">
+              {intro}
             </p>
-          )}
+            {lastUpdated && (
+              <p className="text-sm text-muted-foreground lg:col-span-4 lg:text-right">
+                <span className="text-eyebrow block">Last updated</span>
+                <span className="mt-1.5 block font-medium text-foreground">
+                  {lastUpdated}
+                </span>
+              </p>
+            )}
+          </FadeIn>
         </div>
       </section>
 
@@ -77,50 +99,90 @@ export function LegalDocument({
         </div>
       )}
 
-      <section className="bg-background py-12 sm:py-16">
-        <div className="container-page grid gap-10 lg:grid-cols-12 lg:gap-14">
+      <section className="bg-background py-12 sm:py-16 lg:py-24">
+        <div className="container-page grid gap-12 lg:grid-cols-12 lg:gap-16">
           <nav
             aria-label="On this page"
             className="lg:col-span-4 xl:col-span-3"
           >
-            <div className="lg:sticky lg:top-24">
+            <div className="lg:sticky lg:top-28">
               <p className="text-eyebrow">On this page</p>
-              <ol className="mt-4 space-y-2.5 text-sm">
-                {sections.map((section) => (
-                  <li key={section.id}>
+              <ol className="mt-5 border-t border-border">
+                {sections.map((section, index) => (
+                  <li key={section.id} className="border-b border-border">
                     <a
                       href={`#${section.id}`}
-                      className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-brand"
+                      className="group flex items-baseline gap-3 rounded-sm py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-brand"
                     >
-                      {section.heading}
+                      <span
+                        className="numeral w-6 shrink-0 text-xs text-muted-foreground/70 transition-colors group-hover:text-brand"
+                        aria-hidden
+                      >
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span className="leading-snug">{section.heading}</span>
                     </a>
                   </li>
                 ))}
+                <li className="border-b border-border">
+                  <a
+                    href="#contact-us"
+                    className="group flex items-baseline gap-3 rounded-sm py-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-brand"
+                  >
+                    <span
+                      className="numeral w-6 shrink-0 text-xs text-muted-foreground/70 transition-colors group-hover:text-brand"
+                      aria-hidden
+                    >
+                      {contactNumber}
+                    </span>
+                    <span className="leading-snug">
+                      Contact us about this policy
+                    </span>
+                  </a>
+                </li>
               </ol>
             </div>
           </nav>
 
           <div className="lg:col-span-8 xl:col-span-9">
-            <div className="space-y-12">
-              {sections.map((section) => (
-                <section key={section.id} id={section.id} className="scroll-mt-24">
-                  <h2 className="text-2xl">{section.heading}</h2>
+            <div className="max-w-[46rem]">
+              {sections.map((section, index) => (
+                <section
+                  key={section.id}
+                  id={section.id}
+                  aria-labelledby={`${section.id}-heading`}
+                  className="scroll-mt-28 border-t border-border py-10 first:border-t-0 first:pt-0 sm:py-12"
+                >
+                  <p
+                    className="numeral text-sm text-muted-foreground/70"
+                    aria-hidden
+                  >
+                    {String(index + 1).padStart(2, "0")}
+                  </p>
+                  <h2
+                    id={`${section.id}-heading`}
+                    className="display-md mt-2 text-foreground"
+                  >
+                    {section.heading}
+                  </h2>
 
-                  {section.body?.map((paragraph) => (
-                    <p
-                      key={paragraph}
-                      className="mt-4 max-w-prose text-base leading-relaxed text-muted-foreground"
-                    >
-                      {paragraph}
-                    </p>
-                  ))}
+                  <div className="mt-5 space-y-5">
+                    {section.body?.map((paragraph, paragraphIndex) => (
+                      <p
+                        key={`${section.id}-${paragraphIndex}`}
+                        className="text-[1.0625rem] leading-[1.75] text-foreground/80"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
 
                   {section.placeholder && (
-                    <div className="mt-4 rounded-xl border border-dashed border-warning/40 bg-warning-soft/50 p-5">
+                    <div className="mt-6 rounded-xl border border-dashed border-warning/40 bg-warning-soft/50 p-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-warning">
                         To be completed by {settings.companyName}
                       </p>
-                      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">
+                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         {section.placeholder}
                       </p>
                     </div>
@@ -128,13 +190,28 @@ export function LegalDocument({
                 </section>
               ))}
 
-              <section id="contact-us" className="scroll-mt-24">
-                <h2 className="text-2xl">Contact us about this policy</h2>
-                <p className="mt-4 max-w-prose text-base leading-relaxed text-muted-foreground">
+              <section
+                id="contact-us"
+                aria-labelledby="contact-us-heading"
+                className="scroll-mt-28 border-t border-border py-10 sm:py-12"
+              >
+                <p
+                  className="numeral text-sm text-muted-foreground/70"
+                  aria-hidden
+                >
+                  {contactNumber}
+                </p>
+                <h2
+                  id="contact-us-heading"
+                  className="display-md mt-2 text-foreground"
+                >
+                  Contact us about this policy
+                </h2>
+                <p className="mt-5 text-[1.0625rem] leading-[1.75] text-foreground/80">
                   Questions about this page, or a request about your personal
                   information, can go to the team directly.
                 </p>
-                <ContactDetails className="mt-6" layout="stack" withWhatsApp={false} />
+                <ContactDetails className="mt-8" layout="stack" withWhatsApp={false} />
               </section>
             </div>
           </div>

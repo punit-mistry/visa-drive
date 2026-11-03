@@ -12,13 +12,14 @@ import type {
   PublishedDestination,
 } from "@/components/marketing/catalogue";
 import { DestinationCard } from "@/components/marketing/destination-card";
-import { Reveal, RevealItem } from "@/components/marketing/reveal";
+import { FadeIn, Reveal, RevealItem } from "@/components/marketing/reveal";
 import { useDestinationProducts } from "@/components/marketing/use-destination-products";
 import { VisaDiscoveryForm } from "@/components/marketing/visa-discovery-form";
 import { VisaProductCard } from "@/components/marketing/visa-product-card";
-import { CardGridSkeleton, EmptyState } from "@/components/shared/states";
+import { EmptyState } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { countryName, TRAVEL_PURPOSES } from "@/lib/constants/countries";
 import { formatDate, titleCase } from "@/lib/helpers/format";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,10 @@ interface DiscoveryResult extends CatalogueProduct {
  * `visaProducts.searchForDiscovery` for that search; without them it renders
  * the full published catalogue. Keeping the search in the URL means a result
  * set is shareable and the back button does the obvious thing.
+ *
+ * Both modes open on the same dark masthead and resolve onto the warm paper
+ * ground the homepage uses, so the catalogue reads as a continuation of the
+ * homepage's destinations plates rather than a separate template.
  */
 export function DestinationsBrowser() {
   const params = useSearchParams();
@@ -120,27 +125,31 @@ function DiscoveryResults({
 
   return (
     <>
-      <section className="border-b border-border bg-background">
-        <div className="container-page py-10 sm:py-14">
-          <p className="text-eyebrow">Your search</p>
-          <h1 className="mt-3 text-3xl sm:text-4xl">Visas for {headingName}</h1>
-          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-            {fromCountry && <span>Travelling from {countryName(fromCountry)}</span>}
-            {travelDate && (
-              <>
-                <span aria-hidden>·</span>
-                <span>Around {formatDate(travelDate)}</span>
-              </>
-            )}
-            {purposeLabel && (
-              <>
-                <span aria-hidden>·</span>
-                <span>{purposeLabel}</span>
-              </>
-            )}
-          </p>
+      <section className="bg-ink-black">
+        <div className="container-wide pb-14 pt-10 sm:pb-16 sm:pt-14 lg:pb-24 lg:pt-20">
+          <FadeIn>
+            <p className="text-eyebrow-dark">Your search</p>
+            <h1 className="display-xl mt-4 max-w-4xl text-paper">
+              Visas for {headingName}
+            </h1>
+            <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-white/55 sm:text-base">
+              {fromCountry && <span>Travelling from {countryName(fromCountry)}</span>}
+              {travelDate && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>Around {formatDate(travelDate)}</span>
+                </>
+              )}
+              {purposeLabel && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{purposeLabel}</span>
+                </>
+              )}
+            </p>
+          </FadeIn>
 
-          <div className="mt-8">
+          <FadeIn delay={0.12} className="mt-10 lg:mt-12">
             <VisaDiscoveryForm
               variant="compact"
               defaultValues={{
@@ -150,14 +159,14 @@ function DiscoveryResults({
                 travelDate,
               }}
             />
-          </div>
+          </FadeIn>
         </div>
       </section>
 
-      <section className="bg-surface py-14 sm:py-16">
-        <div className="container-page">
+      <section className="bg-paper py-20 sm:py-24 lg:py-32">
+        <div className="container-wide">
           {search === undefined ? (
-            <CardGridSkeleton count={3} />
+            <ProductGridSkeleton />
           ) : search.results.length === 0 ? (
             <EmptyState
               icon={SearchX}
@@ -175,26 +184,42 @@ function DiscoveryResults({
               }
             />
           ) : (
-            <div className="space-y-14">
-              {grouped.map((group) => (
-                <div key={group.destination.slug}>
-                  <div className="flex flex-wrap items-end justify-between gap-4">
-                    <h2 className="flex items-center gap-2.5 text-2xl">
-                      <span aria-hidden className="text-2xl leading-none">
-                        {group.destination.flagEmoji}
-                      </span>
-                      {group.destination.name}
-                    </h2>
-                    <Button asChild variant="outline" size="sm">
+            <div className="space-y-16 lg:space-y-24">
+              {grouped.map((group, groupIndex) => (
+                <div
+                  key={group.destination.slug}
+                  className={cn(
+                    groupIndex > 0 && "border-t border-border pt-16 lg:pt-24",
+                  )}
+                >
+                  <Reveal className="flex flex-wrap items-end justify-between gap-5">
+                    <div>
+                      <p className="text-eyebrow">
+                        {group.products.length}{" "}
+                        {group.products.length === 1 ? "visa" : "visas"}
+                      </p>
+                      <h2 className="display-lg mt-3 flex items-center gap-3 text-foreground">
+                        <span aria-hidden className="text-[0.8em] leading-none">
+                          {group.destination.flagEmoji}
+                        </span>
+                        {group.destination.name}
+                      </h2>
+                    </div>
+                    <Button asChild variant="outline">
                       <Link href={`/destinations/${group.destination.slug}`}>
                         About {group.destination.name}
                       </Link>
                     </Button>
-                  </div>
+                  </Reveal>
 
-                  <ul className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
                     {group.products.map((product, index) => (
-                      <RevealItem as="li" key={product._id} index={index}>
+                      <RevealItem
+                        as="li"
+                        key={product._id}
+                        index={index}
+                        className="h-full"
+                      >
                         <VisaProductCard
                           product={product}
                           meetsTravelDate={product.meetsTravelDate}
@@ -215,6 +240,18 @@ function DiscoveryResults({
 /* -------------------------------------------------------------------------- */
 /*                               full catalogue                               */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Which cells run two columns wide on the desktop grid. Ten positions repeat:
+ * a wide plate opens the first row, and the next one lands on the right of the
+ * third row, so the eye is walked across the page instead of down a column.
+ * Rows with a wide plate hold two items; every other row holds three, so the
+ * pattern never leaves a gap in a full catalogue.
+ */
+function isWideCell(index: number): boolean {
+  const slot = index % 10;
+  return slot === 0 || slot === 6;
+}
 
 function DestinationGrid() {
   const destinations = useQuery(api.destinations.listPublished, {}) as
@@ -249,68 +286,94 @@ function DestinationGrid() {
 
   return (
     <>
-      <section className="border-b border-border bg-background">
-        <div className="container-page py-12 sm:py-16">
-          <div className="max-w-2xl">
-            <p className="text-eyebrow">Destinations</p>
-            <h1 className="mt-3 text-4xl sm:text-5xl">Where we can help you go</h1>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Every country below is one we handle end to end. Open a destination
-              to see the visa types available and what each one involves.
-            </p>
-          </div>
-
-          <div className="mt-8 max-w-md">
-            <label htmlFor="destination-filter" className="sr-only">
-              Filter destinations
-            </label>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                id="destination-filter"
-                type="search"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                placeholder="Search a country"
-                className="h-12 rounded-full border-border bg-card pl-11 shadow-none"
-              />
+      <section className="bg-ink-black">
+        <div className="container-wide pb-14 pt-10 sm:pb-16 sm:pt-14 lg:pb-24 lg:pt-20">
+          <FadeIn className="grid gap-10 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-8">
+              <p className="text-eyebrow-dark">Destinations</p>
+              <h1 className="display-xl mt-4 text-paper">
+                Where we can
+                <br />
+                help you go
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-relaxed text-white/55 sm:text-lg">
+                Every country below is one we handle end to end. Open a
+                destination to see the visa types available and what each one
+                involves.
+              </p>
             </div>
-          </div>
 
-          {regions.length > 1 && (
-            <div
-              className="mt-5 flex flex-wrap gap-2"
-              role="group"
-              aria-label="Filter by region"
-            >
-              {["all", ...regions].map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  aria-pressed={region === option}
-                  onClick={() => setRegion(option)}
-                  className={cn(
-                    "rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-brand",
-                    region === option
-                      ? "border-brand bg-brand text-brand-foreground"
-                      : "border-border bg-card text-muted-foreground hover:border-brand/40 hover:text-foreground",
-                  )}
+            {destinations !== undefined && destinations.length > 0 && (
+              <div className="lg:col-span-4 lg:text-right">
+                <p
+                  aria-hidden
+                  className="numeral text-7xl leading-none text-paper sm:text-8xl"
                 >
-                  {option === "all" ? "All destinations" : option}
-                </button>
-              ))}
+                  {String(destinations.length).padStart(2, "0")}
+                </p>
+                <p className="mt-3 text-eyebrow-dark">
+                  {destinations.length === 1
+                    ? "Destination published"
+                    : "Destinations published"}
+                </p>
+              </div>
+            )}
+          </FadeIn>
+
+          <FadeIn delay={0.12} className="mt-12 lg:mt-14">
+            <div className="max-w-md">
+              <label htmlFor="destination-filter" className="sr-only">
+                Filter destinations
+              </label>
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/55"
+                  aria-hidden
+                />
+                <Input
+                  id="destination-filter"
+                  type="search"
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  placeholder="Search a country"
+                  className="h-12 rounded-full border-white/20 bg-white/5 pl-11 text-paper shadow-none placeholder:text-white/55 hover:border-white/35 focus-visible:border-white/50 focus-visible:ring-white/20 dark:bg-white/5"
+                />
+              </div>
             </div>
-          )}
+
+            {regions.length > 1 && (
+              <div
+                className="mt-5 flex flex-wrap gap-2"
+                role="group"
+                aria-label="Filter by region"
+              >
+                {["all", ...regions].map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={region === option}
+                    onClick={() => setRegion(option)}
+                    className={cn(
+                      "rounded-full border px-4 py-2 text-sm font-medium outline-none transition-colors",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-ink-black",
+                      region === option
+                        ? "border-brand bg-brand text-brand-foreground"
+                        : "border-white/20 text-white/70 hover:border-white/45 hover:text-white",
+                    )}
+                  >
+                    {option === "all" ? "All destinations" : option}
+                  </button>
+                ))}
+              </div>
+            )}
+          </FadeIn>
         </div>
       </section>
 
-      <section className="bg-surface py-14 sm:py-16">
-        <div className="container-page">
+      <section className="bg-paper py-20 sm:py-24 lg:py-32">
+        <div className="container-wide">
           {visible === undefined ? (
-            <CardGridSkeleton count={6} />
+            <DestinationGridSkeleton />
           ) : visible.length === 0 ? (
             <Reveal>
               <EmptyState
@@ -345,34 +408,86 @@ function DestinationGrid() {
               />
             </Reveal>
           ) : (
-            <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {visible.map((destination, index) => (
-                <RevealItem as="li" key={destination._id} index={index}>
-                  <DestinationCard
-                    className="h-full"
-                    priority={index < 3}
-                    destination={{
-                      _id: destination._id,
-                      slug: destination.slug,
-                      name: destination.name,
-                      countryCode: destination.countryCode,
-                      flagEmoji: destination.flagEmoji,
-                      region: destination.region,
-                      tagline: destination.tagline,
-                      summary: destination.summary,
-                      cardImageUrl: destination.cardImageUrl,
-                      currency: destination.currency,
-                      productCount: destination.productCount,
-                      startingPrice: destination.startingPrice,
-                    }}
-                    products={byDestination[destination.slug] ?? []}
-                  />
-                </RevealItem>
-              ))}
-            </ul>
+            <>
+              <p className="sr-only" role="status" aria-live="polite">
+                {visible.length} {visible.length === 1 ? "destination" : "destinations"}{" "}
+                shown
+              </p>
+              <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+                {visible.map((destination, index) => {
+                  const wide = isWideCell(index);
+                  return (
+                    <RevealItem
+                      as="li"
+                      key={destination._id}
+                      index={index}
+                      className={cn("h-full", wide && "lg:col-span-2")}
+                    >
+                      <DestinationCard
+                        className={cn("h-full", wide && "lg:min-h-[34rem]")}
+                        priority={index < 3}
+                        destination={{
+                          _id: destination._id,
+                          slug: destination.slug,
+                          name: destination.name,
+                          countryCode: destination.countryCode,
+                          flagEmoji: destination.flagEmoji,
+                          region: destination.region,
+                          tagline: destination.tagline,
+                          summary: destination.summary,
+                          cardImageUrl: destination.cardImageUrl,
+                          currency: destination.currency,
+                          productCount: destination.productCount,
+                          startingPrice: destination.startingPrice,
+                        }}
+                        products={byDestination[destination.slug] ?? []}
+                      />
+                    </RevealItem>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </div>
       </section>
     </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  skeletons                                 */
+/* -------------------------------------------------------------------------- */
+
+function DestinationGridSkeleton() {
+  return (
+    <div
+      className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6"
+      aria-busy
+      aria-label="Loading destinations"
+    >
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton
+          key={i}
+          className={cn(
+            "min-h-[27rem] rounded-3xl",
+            i === 0 && "lg:col-span-2 lg:min-h-[34rem]",
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ProductGridSkeleton() {
+  return (
+    <div
+      className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6"
+      aria-busy
+      aria-label="Loading visas"
+    >
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Skeleton key={i} className="min-h-[22rem] rounded-2xl" />
+      ))}
+    </div>
   );
 }

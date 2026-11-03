@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowRight, Plane } from "lucide-react";
+import { ArrowRight, Globe } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { PublishedDestination } from "@/components/marketing/catalogue";
@@ -12,18 +12,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 /**
- * The hero's interactive passport.
+ * The passport plate.
  *
- * Picking a destination presses a stamp onto the page. It is the one moment
- * on the site that is purely delightful, and it has to stay honest while it
- * does it: the stamp records an *appointment* — the thing VisaDrive actually
- * delivers and charges for — never an approval, which is the consulate's
- * decision alone. The wording on the stamp and the line beneath it both say
- * so, because a passport graphic that implies a granted visa would be the
- * exact false promise the client's own disclaimers forbid.
+ * It runs as a loop rather than a one-shot: the cover swings open, six stamps
+ * land in sequence, the page holds, the cover closes, and it begins again. A
+ * demo that plays once and then sits still reads as broken to anyone who
+ * arrives a few seconds late.
  *
- * Everything here is driven by `destinations.listPublished`. No country
- * appears that VisaDrive does not actually serve.
+ * It stays honest while it does it. A stamp records an *appointment* — the
+ * thing VisaDrive actually delivers and charges for — never an approval,
+ * which is the consulate's decision alone. Every country shown comes from
+ * `destinations.listPublished`; none is invented.
+ *
+ * Interaction wins over the loop. Picking a destination pauses the cycle and
+ * presses that stamp immediately; the loop resumes only after the visitor has
+ * been idle for a while, so it never yanks the page out from under them.
  */
 
 interface StampEntry {
@@ -48,6 +51,14 @@ const INK_CLASSES: Record<StampEntry["ink"], string> = {
 /** Six slots: enough to feel like a well-travelled page, few enough to read. */
 const SLOTS = 6;
 
+/* Cycle timings, in milliseconds. */
+const COVER_OPEN_MS = 950;
+const STAMP_GAP_MS = 430;
+const HOLD_MS = 2400;
+const COVER_CLOSE_MS = 700;
+/** How long an interaction suspends the loop for. */
+const RESUME_AFTER_MS = 9000;
+
 const STAMP_DATE = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
@@ -66,9 +77,10 @@ export function PassportCanvas({ className }: { className?: string }) {
     Array.from({ length: SLOTS }, () => null),
   );
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
-  // A ref, not state: this guard decides nothing that is rendered, and as
-  // state it would be a synchronous setState inside the fill effect.
-  const filled = useRef(false);
+  const [open, setOpen] = useState(false);
+  /** Bumping this restarts the cycle effect from the top. */
+  const [cycle, setCycle] = useState(0);
+  const [paused, setPaused] = useState(false);
   const counter = useRef(0);
 
   const available = useMemo(
@@ -94,11 +106,13 @@ export function PassportCanvas({ className }: { className?: string }) {
   const press = useCallback(
     (destination: PublishedDestination) => {
       setActiveSlug(destination.slug);
+      setOpen(true);
       setSlots((current) => {
         const existing = current.findIndex(
           (stamp) => stamp?.slug === destination.slug,
         );
-        const target = existing === -1 ? current.findIndex((s) => s === null) : existing;
+        const target =
+          existing === -1 ? current.findIndex((s) => s === null) : existing;
         if (target === -1) return current;
         const next = [...current];
         next[target] = entry(destination, target);
@@ -108,30 +122,66 @@ export function PassportCanvas({ className }: { className?: string }) {
     [entry],
   );
 
-  // The page fills itself the moment the catalogue arrives, one stamp every
-  // 140ms. A visitor should meet a well-travelled passport, not an empty one
-  // that takes ten seconds to earn its first mark — the fill *is* the hook.
+  /* ------------------------------ the loop ------------------------------ */
   useEffect(() => {
-    if (filled.current || available.length === 0) return;
-    filled.current = true;
+    if (available.length === 0 || paused) return;
 
-    // Reduced motion collapses the stagger to zero, which lands every stamp
-    // on the same tick instead of skipping the fill entirely.
-    const step = reduceMotion ? 0 : 140;
+    // Reduced motion gets the finished state, held, with no cover theatre and
+    // no looping — the loop is the part that would be distracting.
+    if (reduceMotion) {
+      const t = setTimeout(() => {
+        setOpen(true);
+        setSlots(available.map((d, i) => entry(d, i)));
+        setActiveSlug(available[0].slug);
+      }, 0);
+      return () => clearTimeout(t);
+    }
 
-    const timers = available.map((destination, index) =>
-      setTimeout(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms));
+
+    // 1. open the cover
+    at(260, () => setOpen(true));
+
+    // 2. land each stamp behind it
+    available.forEach((destination, index) => {
+      at(260 + COVER_OPEN_MS + index * STAMP_GAP_MS, () => {
         setSlots((current) => {
           const next = [...current];
           next[index] = entry(destination, index);
           return next;
         });
         if (index === 0) setActiveSlug(destination.slug);
-      }, index * step),
+      });
+    });
+
+    const stampedAt = 260 + COVER_OPEN_MS + available.length * STAMP_GAP_MS;
+
+    // 3. hold, close, clear, and go round again
+    at(stampedAt + HOLD_MS, () => setOpen(false));
+    at(stampedAt + HOLD_MS + COVER_CLOSE_MS, () => {
+      setSlots(Array.from({ length: SLOTS }, () => null));
+      setActiveSlug(null);
+    });
+    at(stampedAt + HOLD_MS + COVER_CLOSE_MS + 320, () =>
+      setCycle((value) => value + 1),
     );
 
     return () => timers.forEach(clearTimeout);
-  }, [available, reduceMotion, entry]);
+  }, [available, cycle, paused, reduceMotion, entry]);
+
+  /* --------------------- resume after an interaction -------------------- */
+  useEffect(() => {
+    if (!paused || reduceMotion) return;
+    const t = setTimeout(() => {
+      setSlots(Array.from({ length: SLOTS }, () => null));
+      setActiveSlug(null);
+      setOpen(false);
+      setPaused(false);
+      setCycle((value) => value + 1);
+    }, RESUME_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [paused, reduceMotion]);
 
   const stamps = useMemo(
     () => slots.filter((slot): slot is StampEntry => slot !== null),
@@ -139,15 +189,20 @@ export function PassportCanvas({ className }: { className?: string }) {
   );
   const activeStamp = stamps.find((stamp) => stamp.slug === activeSlug) ?? null;
 
+  function pick(destination: PublishedDestination) {
+    setPaused(true);
+    press(destination);
+  }
+
   return (
-    <div className={cn("flex flex-col gap-5", className)}>
+    <div className={cn("flex flex-col gap-4", className)}>
       {/* ------------------------------ passport --------------------------- */}
       <div
-        className="relative"
+        className="relative [perspective:1800px]"
         role="img"
         aria-label={
           stamps.length === 0
-            ? "An empty passport visa page"
+            ? "A passport, closed"
             : `A passport visa page stamped for ${stamps.map((s) => s.name).join(", ")}`
         }
       >
@@ -172,7 +227,7 @@ export function PassportCanvas({ className }: { className?: string }) {
           </div>
 
           <div className="pl-7">
-            <div className="flex items-center justify-between border-b border-border/70 px-5 py-3">
+            <div className="flex items-center justify-between border-b border-border/70 px-5 py-2.5">
               <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                 Visas · Visas
               </p>
@@ -181,7 +236,7 @@ export function PassportCanvas({ className }: { className?: string }) {
               </p>
             </div>
 
-            <div className="relative grid min-h-[280px] grid-cols-2 gap-3 p-4 sm:min-h-[320px] sm:gap-4 sm:p-5">
+            <div className="relative grid min-h-[250px] grid-cols-2 gap-2 p-3.5 sm:min-h-[285px] sm:gap-3 sm:p-4">
               {/* Faint ruled guides, like a real visa page. */}
               <div
                 aria-hidden
@@ -192,33 +247,26 @@ export function PassportCanvas({ className }: { className?: string }) {
                 }}
               />
 
-              {slots.map((stamp, slot) => {
-                return (
-                  <div
-                    key={slot}
-                    className="relative flex min-h-[86px] items-center justify-center sm:min-h-[96px]"
-                  >
-                    <AnimatePresence mode="popLayout">
-                      {stamp && <Stamp key={stamp.key} stamp={stamp} />}
-                    </AnimatePresence>
-                  </div>
-                );
-              })}
-
-              {stamps.length === 0 && (
-                <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center text-sm text-muted-foreground">
-                  Pick a destination to see it stamped.
-                </p>
-              )}
+              {slots.map((stamp, slot) => (
+                <div
+                  key={slot}
+                  className="relative flex min-h-[78px] items-center justify-center sm:min-h-[88px]"
+                >
+                  <AnimatePresence mode="popLayout">
+                    {stamp && <Stamp key={stamp.key} stamp={stamp} />}
+                  </AnimatePresence>
+                </div>
+              ))}
             </div>
           </div>
         </div>
+
+        {/* ------------------------------- cover ---------------------------- */}
+        <PassportCover open={open} reduceMotion={Boolean(reduceMotion)} />
       </div>
 
       {/* ------------------------------- picker ---------------------------- */}
       <div>
-        <p className="text-eyebrow mb-2.5">Where are you going?</p>
-
         {destinations === undefined ? (
           <div className="flex flex-wrap gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -226,7 +274,7 @@ export function PassportCanvas({ className }: { className?: string }) {
             ))}
           </div>
         ) : available.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/55">
             Our destination catalogue is being set up.{" "}
             <Link
               href="/contact"
@@ -244,15 +292,13 @@ export function PassportCanvas({ className }: { className?: string }) {
                   <button
                     key={destination._id}
                     type="button"
-                    onClick={() => {
-                      press(destination);
-                    }}
+                    onClick={() => pick(destination)}
                     aria-pressed={active}
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all focus-brand",
                       active
                         ? "border-brand bg-brand text-brand-foreground elev-sm"
-                        : "border-border bg-card text-foreground hover:-translate-y-px hover:border-border-strong hover:elev-sm",
+                        : "border-white/20 bg-white/5 text-white/80 hover:-translate-y-px hover:border-white/40 hover:text-white",
                     )}
                   >
                     <span aria-hidden>{destination.flagEmoji}</span>
@@ -262,34 +308,87 @@ export function PassportCanvas({ className }: { className?: string }) {
               })}
             </div>
 
-            <AnimatePresence mode="wait">
-              {activeStamp && (
-                <motion.p
-                  key={activeStamp.slug}
-                  initial={reduceMotion ? false : { opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
-                  transition={{ duration: 0.2 }}
-                  className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
-                >
-                  <Plane className="size-3.5 shrink-0 text-brand" aria-hidden />
-                  <span className="text-muted-foreground">
-                    We handle {activeStamp.name} appointments end to end.
-                  </span>
-                  <Link
-                    href={`/destinations/${activeStamp.slug}`}
-                    className="inline-flex items-center gap-1 font-medium text-brand underline-offset-4 hover:underline focus-brand"
+            {/* Reserved height, so the caption appearing never nudges the
+                chips above it. */}
+            <div className="mt-3 min-h-6">
+              <AnimatePresence mode="wait">
+                {activeStamp && (
+                  <motion.p
+                    key={activeStamp.slug}
+                    initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
                   >
-                    See visa options
-                    <ArrowRight className="size-3.5" aria-hidden />
-                  </Link>
-                </motion.p>
-              )}
-            </AnimatePresence>
+                    <span className="text-white/55">
+                      {activeStamp.name} appointments, handled end to end.
+                    </span>
+                    <Link
+                      href={`/destinations/${activeStamp.slug}`}
+                      className="inline-flex items-center gap-1 font-medium text-brand underline-offset-4 hover:underline focus-brand"
+                    >
+                      See visa options
+                      <ArrowRight className="size-3.5" aria-hidden />
+                    </Link>
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The cover, hinged on the spine.
+ *
+ * It swings back on the left edge and fades as it passes the hinge, so it
+ * never escapes the layout on a narrow screen — a cover flapping outside the
+ * grid is the one thing that would make this read as a gimmick.
+ */
+function PassportCover({
+  open,
+  reduceMotion,
+}: {
+  open: boolean;
+  reduceMotion: boolean;
+}) {
+  if (reduceMotion) return null;
+
+  return (
+    <motion.div
+      aria-hidden
+      className="absolute inset-0 origin-left rounded-2xl border border-white/10 [transform-style:preserve-3d]"
+      style={{
+        background:
+          "linear-gradient(145deg, #2a1012 0%, #1a0a0c 45%, #250f11 100%)",
+      }}
+      animate={{ rotateY: open ? -162 : 0, opacity: open ? 0 : 1 }}
+      transition={{
+        rotateY: { duration: 0.95, ease: [0.76, 0, 0.24, 1] },
+        opacity: { duration: 0.45, delay: open ? 0.5 : 0 },
+      }}
+    >
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+        <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.3em] text-white/35">
+          Passport
+        </span>
+
+        <span className="flex size-16 items-center justify-center rounded-full border border-white/20 text-white/40">
+          <Globe className="size-7" strokeWidth={1.2} />
+        </span>
+
+        <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-white/30">
+          VisaDrive
+        </span>
+      </div>
+
+      {/* A hairline inset frame, the way a real cover is blind-embossed. */}
+      <span className="pointer-events-none absolute inset-3 rounded-xl border border-white/10" />
+    </motion.div>
   );
 }
 
@@ -299,7 +398,7 @@ function Stamp({ stamp }: { stamp: StampEntry }) {
   const content = (
     <div
       className={cn(
-        "flex size-[84px] flex-col items-center justify-center rounded-full border-[2.5px] text-center sm:size-[94px]",
+        "flex size-[78px] flex-col items-center justify-center rounded-full border-[2.5px] text-center sm:size-[88px]",
         INK_CLASSES[stamp.ink],
       )}
       style={{ transform: `rotate(${stamp.tilt}deg)` }}
@@ -311,8 +410,8 @@ function Stamp({ stamp }: { stamp: StampEntry }) {
         {stamp.countryCode}
       </span>
       {/* Two tight lines rather than one truncated one: "United Arab
-          Emirates" has to survive an 84px circle. */}
-      <span className="mt-0.5 line-clamp-2 max-w-[70px] px-1 font-mono text-[6.5px] font-bold uppercase leading-[1.25] tracking-[0.06em]">
+          Emirates" has to survive a 78px circle. */}
+      <span className="mt-0.5 line-clamp-2 max-w-[66px] px-1 font-mono text-[6.5px] font-bold uppercase leading-[1.25] tracking-[0.06em]">
         {stamp.name}
       </span>
       <span className="mt-1 font-mono text-[6.5px] uppercase tracking-[0.1em] opacity-75">

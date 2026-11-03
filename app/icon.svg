@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="VisaDrive">
+  <!--
+    The full logo is a globe, a plane and a two-weight wordmark. None of that
+    survives a 16px tab, so the favicon is the one element that does: the V of
+    VISA, in the brand red, as a solid mark.
+
+    The V is a path rather than type, so the icon never depends on a font
+    being available or on how a platform hints it at small sizes.
+  -->
+  <rect width="64" height="64" rx="14" fill="#D82828"/>
+  <path d="M14 18 L23 18 L32 38 L41 18 L50 18 L36 47 L28 47 Z" fill="#FFFFFF"/>
+</svg>

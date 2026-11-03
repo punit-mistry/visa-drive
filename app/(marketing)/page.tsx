@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 
+import { DestinationEditorial } from "@/components/marketing/destination-editorial";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { Hero } from "@/components/marketing/hero";
-import { HowItWorks } from "@/components/marketing/how-it-works";
-import { PopularDestinations } from "@/components/marketing/popular-destinations";
-import { ServicesSection } from "@/components/marketing/services-section";
+import { PassportSection } from "@/components/marketing/passport-section";
+import { ServicesEditorial } from "@/components/marketing/services-editorial";
 import { Testimonials } from "@/components/marketing/testimonials";
 import { TrustSection } from "@/components/marketing/trust-section";
-import { ValueProps } from "@/components/marketing/value-props";
+import { VisaJourney } from "@/components/marketing/visa-journey";
 import { SITE } from "@/lib/constants/site";
 
 export const metadata: Metadata = {
@@ -18,26 +18,31 @@ export const metadata: Metadata = {
 };
 
 /**
- * Homepage order follows the order of a visitor's questions:
- * where can you send me → can I trust you → how does it work → what else do
- * you do → what are people asking. The trust section sits third because the
- * objection it answers ("is this a scam?") blocks every section after it.
+ * Homepage composition, read as a magazine: a cover (the hero), the plates
+ * everyone came for (destinations), the reason to believe (trust), how it
+ * works (the journey), the interactive plate (the passport), the index of
+ * what we sell (services), then a closing frame.
  *
- * Tones alternate white/surface so the page reads as one document rather
- * than a stack of unrelated blocks.
+ * The grounds are weighted deliberately — roughly six parts dark to three
+ * parts warm paper. Dark is the brand's resting state and what makes the
+ * photography and the red read as cinematic; the paper sections exist to
+ * break it, which only works while they stay the minority.
+ *
+ *   dark   hero · trust · journey · passport · testimonials · closing frame
+ *   paper  destinations · services · questions
  */
 export default function HomePage() {
   return (
     <>
       <Hero />
-      <PopularDestinations />
+      <DestinationEditorial />
       <TrustSection />
-      <HowItWorks tone="surface" />
-      <ValueProps />
-      <ServicesSection tone="surface" />
-      <Testimonials tone="default" />
+      <VisaJourney />
+      <PassportSection />
+      <ServicesEditorial />
+      <Testimonials tone="dark" />
       <FaqSection
-        tone="surface"
+        tone="paper"
         scope="global"
         title="Questions, answered"
         description="The things people ask us most often, answered by our team."

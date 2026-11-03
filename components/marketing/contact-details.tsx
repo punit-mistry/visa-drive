@@ -20,7 +20,7 @@ export function ContactDetails({
   withWhatsApp = true,
 }: {
   className?: string;
-  layout?: "stack" | "grid";
+  layout?: "stack" | "grid" | "rows";
   withWhatsApp?: boolean;
 }) {
   const settings = useSiteSettings();
@@ -51,19 +51,28 @@ export function ContactDetails({
     <div className={className}>
       <ul
         className={cn(
-          layout === "grid"
-            ? "grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-3"
-            : "space-y-5",
+          layout === "grid" &&
+            "grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-3",
+          layout === "stack" && "space-y-5",
+          layout === "rows" && "border-t border-ink-black/12",
         )}
       >
         {items.map((item) => (
           <li
             key={item.label}
             className={cn(
-              layout === "grid" ? "bg-card p-5" : "flex items-start gap-3.5",
+              layout === "grid" && "bg-card p-5",
+              layout === "stack" && "flex items-start gap-3.5",
+              layout === "rows" &&
+                "grid items-baseline gap-1 border-b border-ink-black/12 py-5 sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:gap-6",
             )}
           >
-            {layout === "grid" ? (
+            {layout === "rows" ? (
+              <>
+                <p className="text-eyebrow">{item.label}</p>
+                <ContactValue item={item} large />
+              </>
+            ) : layout === "grid" ? (
               <>
                 <span className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-surface text-brand">
                   <item.icon className="size-4" aria-hidden />
@@ -102,6 +111,7 @@ export function ContactDetails({
 function ContactValue({
   item,
   className,
+  large = false,
 }: {
   item: {
     value: string;
@@ -110,9 +120,10 @@ function ContactValue({
     secondaryHref?: string;
   };
   className?: string;
+  large?: boolean;
 }) {
   return (
-    <div className={cn("text-sm", className)}>
+    <div className={cn(large ? "text-base sm:text-lg" : "text-sm", className)}>
       {item.href ? (
         <a
           href={item.href}
@@ -121,7 +132,9 @@ function ContactValue({
           {item.value}
         </a>
       ) : (
-        <span className="text-muted-foreground">{item.value}</span>
+        <span className={large ? "text-foreground" : "text-muted-foreground"}>
+          {item.value}
+        </span>
       )}
 
       {item.secondary && item.secondaryHref && (

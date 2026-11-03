@@ -1,3 +1,4 @@
+import type { SectionTone } from "@/components/marketing/section";
 import Link from "next/link";
 import {
   FileText,
@@ -8,7 +9,6 @@ import {
 } from "lucide-react";
 
 import { Reveal, RevealItem } from "@/components/marketing/reveal";
-import { Section, SectionIntro } from "@/components/marketing/section";
 import { Button } from "@/components/ui/button";
 
 export interface HowItWorksStep {
@@ -59,57 +59,99 @@ export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   },
 ];
 
+/**
+ * Compact summary of the four steps, for embedding on other pages. The full
+ * treatment — with the detail paragraph for each step — is `HowItWorksSteps`,
+ * which the /how-it-works page uses.
+ */
 export function HowItWorks({
-  tone = "default",
   withCta = true,
 }: {
-  tone?: "default" | "surface";
+  /** Kept for call-site compatibility; the editorial layout has one ground. */
+  tone?: SectionTone;
   withCta?: boolean;
 }) {
   return (
-    <Section tone={tone}>
-      <SectionIntro
-        eyebrow="How it works"
-        title="Four steps, start to finish"
-        description="A visa application is mostly paperwork and timing. We take both off your desk and keep you informed at every stage."
-        action={
-          withCta ? (
-            <Button asChild variant="outline">
+    <section className="bg-paper py-20 sm:py-24 lg:py-32">
+      <div className="container-wide">
+        <Reveal className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-eyebrow">How it works</p>
+            <h2 className="display-xl mt-4 text-ink-black">
+              Four steps,
+              <br />
+              start to finish.
+            </h2>
+            <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
+              A visa application is mostly paperwork and timing. We take both
+              off your desk and keep you informed at every stage.
+            </p>
+          </div>
+          {withCta && (
+            <Button asChild variant="outline" className="shrink-0">
               <Link href="/how-it-works">Read the detail</Link>
             </Button>
-          ) : undefined
-        }
-      />
+          )}
+        </Reveal>
 
-      <ol className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:mt-12">
-        {HOW_IT_WORKS_STEPS.map((step, index) => (
-          <RevealItem as="li" key={step.number} index={index} className="bg-card">
-            <div className="flex h-full flex-col p-6 lg:p-7">
-              <div className="flex items-center justify-between">
-                <span className="inline-flex size-10 items-center justify-center rounded-xl border border-border bg-background text-brand">
-                  <step.icon className="size-[18px]" aria-hidden />
-                </span>
-                <span className="font-mono text-xs text-muted-foreground/70">
+        <ol className="mt-14 grid border-t border-ink-black/12 sm:grid-cols-2 lg:mt-20 lg:grid-cols-4">
+          {HOW_IT_WORKS_STEPS.map((step, index) => (
+            <RevealItem as="li" key={step.number} index={index}>
+              <div className="group h-full border-b border-ink-black/12 py-8 sm:pr-8 lg:border-b-0 lg:py-10">
+                <span className="numeral text-5xl leading-none text-ink-black/25 transition-colors duration-500 group-hover:text-brand">
                   {step.number}
                 </span>
+                <h3 className="display-md mt-6 text-ink-black">{step.title}</h3>
+                <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
+                  {step.body}
+                </p>
               </div>
-              <h3 className="mt-5 text-base font-semibold sm:text-base">
-                {step.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            </RevealItem>
+          ))}
+        </ol>
+
+        <Reveal>
+          <p className="mt-6 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Visa decisions are made by the relevant authorities. Our job is to
+            make sure nothing in your application is the reason for a delay.
+          </p>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The full walk-through: one row per step, with the plain description and the
+ * detail paragraph beside it. Numerals are oversized and quiet until a row is
+ * hovered, when the brand red picks the active step out.
+ */
+export function HowItWorksSteps() {
+  return (
+    <ol className="border-t border-ink-black/12">
+      {HOW_IT_WORKS_STEPS.map((step, index) => (
+        <RevealItem as="li" key={step.number} index={index}>
+          <div className="group grid gap-x-8 gap-y-5 border-b border-ink-black/12 py-10 sm:grid-cols-[auto_minmax(0,1fr)] lg:grid-cols-[9rem_minmax(0,22rem)_minmax(0,1fr)] lg:py-14">
+            <span className="numeral text-5xl leading-none text-ink-black/25 transition-colors duration-500 group-hover:text-brand lg:text-7xl">
+              {step.number}
+            </span>
+
+            <div>
+              <step.icon className="size-5 text-brand" aria-hidden />
+              <h2 className="display-md mt-4 text-ink-black">{step.title}</h2>
+            </div>
+
+            <div className="sm:col-start-2 lg:col-start-3">
+              <p className="max-w-lg text-lg leading-relaxed text-ink-black">
                 {step.body}
               </p>
+              <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-muted-foreground">
+                {step.detail}
+              </p>
             </div>
-          </RevealItem>
-        ))}
-      </ol>
-
-      <Reveal>
-        <p className="mt-6 text-sm text-muted-foreground">
-          Visa decisions are made by the relevant authorities. Our job is to make
-          sure nothing in your application is the reason for a delay.
-        </p>
-      </Reveal>
-    </Section>
+          </div>
+        </RevealItem>
+      ))}
+    </ol>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "convex/react";
-import { Check, ExternalLink, FileText, Info, SearchX } from "lucide-react";
+import { ArrowRight, Check, ExternalLink, FileText, Info, SearchX } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import {
@@ -14,9 +14,9 @@ import {
   standardPrice,
   type CatalogueProduct,
 } from "@/components/marketing/catalogue";
-import { Crumbs } from "@/components/marketing/crumbs";
+import { DarkCrumbs } from "@/components/marketing/destination-detail";
 import { LegalNotes } from "@/components/marketing/legal-notes";
-import { Reveal } from "@/components/marketing/reveal";
+import { FadeIn, Reveal } from "@/components/marketing/reveal";
 import {
   Accordion,
   AccordionContent,
@@ -75,6 +75,10 @@ const APPLIES_TO_LABELS: Record<string, string> = {
  * are all admin-configured. Each block below renders only when the database
  * holds a value for it, and the `isDemoContent` flag puts a "Sample data"
  * badge directly beside the price it applies to.
+ *
+ * Layout: a dark typographic masthead (this product has no photograph of its
+ * own, so it does not pretend to), then a paper ground where the editorial
+ * column reads on the left and the price sheet stays in view on the right.
  */
 export function VisaProductDetail({
   destinationSlug,
@@ -92,25 +96,27 @@ export function VisaProductDetail({
 
   if (product === null) {
     return (
-      <div className="container-page py-20 sm:py-28">
-        <EmptyState
-          icon={SearchX}
-          title="We could not find that visa"
-          description="It may have been renamed or withdrawn from the catalogue."
-          action={
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button asChild>
-                <Link href={`/destinations/${destinationSlug}`}>
-                  Back to destination
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/contact">Ask us about this visa</Link>
-              </Button>
-            </div>
-          }
-        />
-      </div>
+      <section className="bg-paper py-20 sm:py-24 lg:py-32">
+        <div className="container-wide">
+          <EmptyState
+            icon={SearchX}
+            title="We could not find that visa"
+            description="It may have been renamed or withdrawn from the catalogue."
+            action={
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button asChild>
+                  <Link href={`/destinations/${destinationSlug}`}>
+                    Back to destination
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/contact">Ask us about this visa</Link>
+                </Button>
+              </div>
+            }
+          />
+        </div>
+      </section>
     );
   }
 
@@ -127,16 +133,17 @@ export function VisaProductDetail({
     <>
       {product.isPreview && (
         <div className="border-b border-warning/25 bg-warning-soft">
-          <div className="container-page py-2.5 text-sm font-medium text-warning">
+          <div className="container-wide py-2.5 text-sm font-medium text-warning">
             Draft preview — this visa is not published and is visible to staff
             only.
           </div>
         </div>
       )}
 
-      <section className="border-b border-border bg-background">
-        <div className="container-page py-10 sm:py-12">
-          <Crumbs
+      {/* ----------------------------- masthead ----------------------------- */}
+      <section className="bg-ink-black">
+        <div className="container-wide pb-14 pt-10 sm:pb-16 lg:pb-24">
+          <DarkCrumbs
             items={[
               { label: "Destinations", href: "/destinations" },
               {
@@ -147,36 +154,41 @@ export function VisaProductDetail({
             ]}
           />
 
-          <div className="mt-8 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-muted-foreground">
-              <span aria-hidden>{product.destination.flagEmoji}</span>
-              {product.destination.name}
-            </span>
-            <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-muted-foreground">
-              {categoryLabel(product.category)}
-            </span>
-            {product.visaType && (
-              <span className="rounded-full border border-brand-soft bg-brand-tint px-2.5 py-1 text-xs font-medium text-brand">
-                {product.visaType}
+          <FadeIn className="mt-14 sm:mt-20 lg:mt-24">
+            <p className="text-eyebrow-dark flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span aria-hidden className="text-base leading-none">
+                {product.destination.flagEmoji}
               </span>
-            )}
-          </div>
+              {product.destination.name}
+              <span aria-hidden className="h-px w-6 bg-white/25" />
+              {categoryLabel(product.category)}
+              {product.visaType && (
+                <>
+                  <span aria-hidden className="size-1 rounded-full bg-brand" />
+                  {product.visaType}
+                </>
+              )}
+            </p>
 
-          <h1 className="mt-5 max-w-3xl text-4xl sm:text-5xl">{product.name}</h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            {product.shortDescription}
-          </p>
+            <h1 className="display-xl mt-6 max-w-5xl text-paper">
+              {product.name}
+            </h1>
+            <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/60 sm:text-lg">
+              {product.shortDescription}
+            </p>
+          </FadeIn>
         </div>
       </section>
 
-      <section className="bg-background py-12 sm:py-16">
-        <div className="container-page grid gap-10 lg:grid-cols-12 lg:gap-14">
+      <section className="bg-paper py-20 sm:py-24 lg:py-32">
+        <div className="container-wide grid gap-14 lg:grid-cols-12 lg:gap-16">
           {/* ----------------------------- main ----------------------------- */}
-          <div className="space-y-12 lg:col-span-7 xl:col-span-8">
+          <div className="space-y-16 lg:col-span-7 lg:space-y-20 xl:col-span-8">
             {product.detailedDescription && (
               <Reveal>
-                <h2 className="text-2xl">About this visa</h2>
-                <p className="mt-4 max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground">
+                <p className="text-eyebrow">Overview</p>
+                <h2 className="display-md mt-4 text-foreground">About this visa</h2>
+                <p className="mt-6 max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground sm:text-lg">
                   {product.detailedDescription}
                 </p>
               </Reveal>
@@ -184,22 +196,25 @@ export function VisaProductDetail({
 
             {product.requirements.length > 0 && (
               <Reveal>
-                <h2 className="text-2xl">Documents you will need</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="text-eyebrow">Checklist</p>
+                <h2 className="display-md mt-4 text-foreground">
+                  Documents you will need
+                </h2>
+                <p className="mt-4 max-w-prose text-base leading-relaxed text-muted-foreground">
                   The checklist recorded for this visa. We review each document
                   before anything is submitted.
                 </p>
-                <ul className="mt-6 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                <ul className="mt-8 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
                   {product.requirements.map((requirement) => {
                     const audience = APPLIES_TO_LABELS[requirement.appliesTo];
                     return (
-                      <li key={requirement._id} className="flex gap-4 p-5">
+                      <li key={requirement._id} className="flex gap-4 p-5 sm:p-6">
                         <FileText
                           className="mt-0.5 size-4 shrink-0 text-brand"
                           aria-hidden
                         />
                         <div className="min-w-0">
-                          <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
                             {requirement.label}
                             {!requirement.isMandatory && (
                               <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
@@ -227,8 +242,9 @@ export function VisaProductDetail({
 
             {product.eligibilityNotes && (
               <Reveal>
-                <h2 className="text-2xl">Who can apply</h2>
-                <p className="mt-4 max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground">
+                <p className="text-eyebrow">Eligibility</p>
+                <h2 className="display-md mt-4 text-foreground">Who can apply</h2>
+                <p className="mt-6 max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground sm:text-lg">
                   {product.eligibilityNotes}
                 </p>
               </Reveal>
@@ -236,10 +252,12 @@ export function VisaProductDetail({
 
             {product.importantInformation && (
               <Reveal>
-                <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+                <div className="flex items-start gap-4 rounded-2xl border border-border bg-card p-6 sm:p-7">
                   <Info className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
                   <div>
-                    <h2 className="text-sm font-semibold">Important information</h2>
+                    <h2 className="text-sm font-semibold text-foreground">
+                      Important information
+                    </h2>
                     <p className="mt-2 max-w-prose whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
                       {product.importantInformation}
                     </p>
@@ -250,18 +268,21 @@ export function VisaProductDetail({
 
             {product.faqs.length > 0 && (
               <Reveal>
-                <h2 className="text-2xl">Questions about this visa</h2>
+                <p className="text-eyebrow">FAQ</p>
+                <h2 className="display-md mt-4 text-foreground">
+                  Questions about this visa
+                </h2>
                 <Accordion
                   type="single"
                   collapsible
-                  className="mt-5 rounded-2xl border border-border bg-card px-5 sm:px-6"
+                  className="mt-8 border-t border-border"
                 >
                   {product.faqs.map((faq) => (
                     <AccordionItem key={faq._id} value={faq._id}>
-                      <AccordionTrigger className="text-left text-base font-medium hover:no-underline">
+                      <AccordionTrigger className="py-5 text-left text-base font-medium hover:no-underline sm:text-lg">
                         {faq.question}
                       </AccordionTrigger>
-                      <AccordionContent className="max-w-prose whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                      <AccordionContent className="max-w-prose whitespace-pre-line text-base leading-relaxed text-muted-foreground">
                         {faq.answer}
                       </AccordionContent>
                     </AccordionItem>
@@ -271,6 +292,7 @@ export function VisaProductDetail({
             )}
 
             <LegalNotes
+              className="bg-card"
               keys={[
                 "notAffiliated",
                 "noGuarantee",
@@ -282,13 +304,13 @@ export function VisaProductDetail({
 
           {/* ---------------------------- sidebar ---------------------------- */}
           <aside className="lg:col-span-5 xl:col-span-4">
-            <div className="lg:sticky lg:top-24">
-              <div className="rounded-2xl border border-border bg-card p-6 elev-md">
+            <div className="lg:sticky lg:top-28">
+              <div className="rounded-2xl border border-border bg-card p-6 elev-md sm:p-7">
                 {price !== null ? (
                   <>
                     <p className="text-eyebrow">Price per traveller</p>
-                    <p className="mt-2 flex flex-wrap items-baseline gap-2">
-                      <span className="text-3xl font-semibold tracking-tight">
+                    <p className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="numeral text-5xl leading-none text-foreground">
                         {formatMoney(price, product.currency, "en-IN", {
                           hideDecimals: true,
                         })}
@@ -302,17 +324,17 @@ export function VisaProductDetail({
                       )}
                     </p>
                     {product.isDemoContent && (
-                      <DemoContentBadge className="mt-3" />
+                      <DemoContentBadge className="mt-4" />
                     )}
 
                     {(hasGovernmentFee || hasServiceFee) && (
-                      <dl className="mt-5 space-y-2 border-t border-border pt-5 text-sm">
+                      <dl className="mt-6 space-y-2.5 border-t border-border pt-6 text-sm">
                         {hasGovernmentFee && (
                           <div className="flex items-baseline justify-between gap-4">
                             <dt className="text-muted-foreground">
                               Government fee
                             </dt>
-                            <dd className="font-medium">
+                            <dd className="font-medium text-foreground">
                               {formatMoney(
                                 product.governmentFee,
                                 product.currency,
@@ -327,7 +349,7 @@ export function VisaProductDetail({
                             <dt className="text-muted-foreground">
                               VisaDrive service fee
                             </dt>
-                            <dd className="font-medium">
+                            <dd className="font-medium text-foreground">
                               {formatMoney(
                                 product.serviceFee,
                                 product.currency,
@@ -342,7 +364,7 @@ export function VisaProductDetail({
                             <dt className="text-muted-foreground">
                               Additional charges
                             </dt>
-                            <dd className="font-medium">
+                            <dd className="font-medium text-foreground">
                               {formatMoney(
                                 product.additionalCharges,
                                 product.currency,
@@ -355,7 +377,7 @@ export function VisaProductDetail({
                         {product.taxPercent > 0 && (
                           <div className="flex items-baseline justify-between gap-4">
                             <dt className="text-muted-foreground">Tax</dt>
-                            <dd className="font-medium">
+                            <dd className="font-medium text-foreground">
                               {product.taxPercent}%
                             </dd>
                           </div>
@@ -366,17 +388,17 @@ export function VisaProductDetail({
                 ) : (
                   <>
                     <p className="text-eyebrow">Price</p>
-                    <p className="mt-2 text-base font-medium">
+                    <p className="display-md mt-3 text-foreground">
                       Quoted on enquiry
                     </p>
-                    <p className="mt-1.5 text-sm text-muted-foreground">
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                       We have not published a fee for this visa yet. Ask us and we
                       will give you the current figure.
                     </p>
                   </>
                 )}
 
-                <dl className="mt-5 space-y-3 border-t border-border pt-5 text-sm">
+                <dl className="mt-6 space-y-3 border-t border-border pt-6 text-sm">
                   {processing && (
                     <Row label="Processing time" value={processing} />
                   )}
@@ -400,13 +422,23 @@ export function VisaProductDetail({
                   {paymentMode && <Row label="Payment" value={paymentMode} />}
                 </dl>
 
-                <div className="mt-6 space-y-3">
-                  <Button asChild size="lg" className="w-full">
+                <div className="mt-7 space-y-3">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="h-12 w-full text-[15px] font-semibold"
+                  >
                     <Link href={`/apply?product=${product._id}`}>
                       Start your application
+                      <ArrowRight className="size-4" aria-hidden />
                     </Link>
                   </Button>
-                  <Button asChild size="lg" variant="outline" className="w-full">
+                  <Button
+                    asChild
+                    size="lg"
+                    variant="outline"
+                    className="h-12 w-full text-[15px] font-semibold"
+                  >
                     <Link
                       href={`/contact?destination=${encodeURIComponent(
                         product.destination.name,
@@ -418,13 +450,13 @@ export function VisaProductDetail({
                 </div>
 
                 {product.officialSourceUrl && (
-                  <p className="mt-5 border-t border-border pt-5 text-xs leading-relaxed text-muted-foreground">
+                  <p className="mt-6 border-t border-border pt-6 text-xs leading-relaxed text-muted-foreground">
                     Official source:{" "}
                     <a
                       href={product.officialSourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-sm font-medium text-brand underline-offset-4 hover:underline focus-brand"
+                      className="link-rule rounded-sm font-medium text-brand focus-brand"
                     >
                       view
                       <ExternalLink className="size-3" aria-hidden />
@@ -436,7 +468,7 @@ export function VisaProductDetail({
                 )}
               </div>
 
-              <ul className="mt-5 space-y-2.5 px-1 text-sm text-muted-foreground">
+              <ul className="mt-6 space-y-3 px-1 text-sm text-muted-foreground">
                 {[
                   "Documents checked before submission",
                   "One team on your application, start to finish",
@@ -460,7 +492,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium">{value}</dd>
+      <dd className="text-right font-medium text-foreground">{value}</dd>
     </div>
   );
 }
@@ -468,18 +500,18 @@ function Row({ label, value }: { label: string; value: string }) {
 function ProductSkeleton() {
   return (
     <>
-      <section className="border-b border-border bg-background">
-        <div className="container-page py-10 sm:py-12">
-          <Skeleton className="h-4 w-64" />
-          <Skeleton className="mt-8 h-6 w-48" />
-          <Skeleton className="mt-5 h-12 w-full max-w-xl" />
-          <Skeleton className="mt-4 h-5 w-full max-w-2xl" />
+      <section className="bg-ink-black" aria-busy aria-label="Loading visa">
+        <div className="container-wide pb-14 pt-10 sm:pb-16 lg:pb-24">
+          <Skeleton className="h-4 w-64 bg-white/10" />
+          <Skeleton className="mt-20 h-4 w-72 bg-white/10" />
+          <Skeleton className="mt-6 h-16 w-full max-w-2xl bg-white/10 sm:h-24" />
+          <Skeleton className="mt-6 h-5 w-full max-w-xl bg-white/10" />
         </div>
       </section>
-      <section className="bg-background py-12 sm:py-16">
-        <div className="container-page grid gap-10 lg:grid-cols-12 lg:gap-14">
+      <section className="bg-paper py-20 sm:py-24 lg:py-32">
+        <div className="container-wide grid gap-14 lg:grid-cols-12 lg:gap-16">
           <div className="space-y-6 lg:col-span-7 xl:col-span-8">
-            <Skeleton className="h-8 w-56" />
+            <Skeleton className="h-9 w-56" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-11/12" />
             <Skeleton className="h-4 w-9/12" />

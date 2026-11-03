@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, Check } from "lucide-react";
 
 import { Crumbs } from "@/components/marketing/crumbs";
 import { FinalCta } from "@/components/marketing/final-cta";
-import { IconGlyph, IconTile } from "@/components/marketing/icon";
+import { HOW_IT_WORKS_STEPS } from "@/components/marketing/how-it-works";
 import { LegalNotes } from "@/components/marketing/legal-notes";
-import { Reveal, RevealItem } from "@/components/marketing/reveal";
+import { FadeIn, Reveal, RevealItem } from "@/components/marketing/reveal";
+import { ServiceIndexList } from "@/components/marketing/services-section";
 import {
   MARKETING_SERVICES,
   SERVICE_SLUGS,
   serviceBySlug,
 } from "@/components/marketing/services";
-import { HOW_IT_WORKS_STEPS } from "@/components/marketing/how-it-works";
-import { Button } from "@/components/ui/button";
 import { WhatsAppButton } from "@/components/shared/whatsapp-button";
+import { Button } from "@/components/ui/button";
 
 export function generateStaticParams() {
   return SERVICE_SLUGS.map((slug) => ({ slug }));
@@ -51,10 +50,16 @@ export default async function ServicePage({
   if (!service) notFound();
 
   const others = MARKETING_SERVICES.filter((item) => item.key !== service.key);
+  const position =
+    MARKETING_SERVICES.findIndex((item) => item.key === service.key) + 1;
+  const pad = (value: number) => String(value).padStart(2, "0");
+
   return (
     <>
-      <section className="border-b border-border bg-background">
-        <div className="container-page py-10 sm:py-14 lg:py-16">
+      {/* Opening — warm paper ground, the service's place in the index set
+          oversized beside its name. */}
+      <section className="bg-paper py-16 sm:py-20 lg:py-28">
+        <div className="container-wide">
           <Crumbs
             items={[
               { label: "Services", href: "/services" },
@@ -62,95 +67,117 @@ export default async function ServicePage({
             ]}
           />
 
-          <div className="mt-8 max-w-2xl">
-            <IconTile
-              name={service.icon}
-              className="size-12 rounded-2xl bg-surface"
-              iconClassName="size-5"
-            />
-            <h1 className="mt-6 text-4xl sm:text-5xl">{service.name}</h1>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-              {service.summary}
-            </p>
+          <FadeIn className="mt-12 grid gap-10 lg:mt-16 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-8">
+              <p className="text-eyebrow">
+                Service {pad(position)} of {pad(MARKETING_SERVICES.length)}
+              </p>
+              <h1 className="display-xl mt-4 text-ink-black">{service.name}</h1>
+              <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+                {service.summary}
+              </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg">
-                <Link
-                  href={`/contact?service=${encodeURIComponent(service.name)}`}
-                >
-                  Enquire about this service
-                </Link>
-              </Button>
-              <WhatsAppButton
-                variant="inline"
-                className="h-10 px-6"
-                label="Ask on WhatsApp"
-                message={`Hi VisaDrive, I would like help with ${service.name}.`}
-              />
+              <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+                <Button asChild size="lg" className="h-12 px-7 text-[15px] font-semibold">
+                  <Link
+                    href={`/contact?service=${encodeURIComponent(service.name)}`}
+                  >
+                    Enquire about this service
+                  </Link>
+                </Button>
+                <WhatsAppButton
+                  variant="inline"
+                  className="h-12 px-6 text-[15px]"
+                  label="Ask on WhatsApp"
+                  message={`Hi VisaDrive, I would like help with ${service.name}.`}
+                />
+              </div>
             </div>
-          </div>
+
+            <span
+              aria-hidden
+              className="numeral hidden text-[9rem] leading-none text-ink-black/10 lg:col-span-4 lg:block lg:text-right xl:text-[12rem]"
+            >
+              {pad(position)}
+            </span>
+          </FadeIn>
         </div>
       </section>
 
       {/* How this works — the same four steps every VisaDrive engagement runs
           through. Nothing service-specific is claimed here that the client has
           not already put in writing. */}
-      <section className="border-b border-border bg-surface py-14 sm:py-20">
-        <div className="container-page">
-          <Reveal>
-            <p className="text-eyebrow">How it works</p>
-            <h2 className="mt-3 text-3xl sm:text-4xl">
-              What happens after you get in touch
-            </h2>
+      <section className="bg-ink-black py-20 text-paper sm:py-24 lg:py-32">
+        <div className="container-wide">
+          <Reveal className="grid gap-8 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-7">
+              <p className="text-eyebrow-dark">How it works</p>
+              <h2 className="display-xl mt-4 text-paper">
+                What happens after
+                <br />
+                you get in touch.
+              </h2>
+            </div>
           </Reveal>
 
-          <ol className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2">
+          <ol className="mt-14 lg:mt-20">
             {HOW_IT_WORKS_STEPS.map((step, index) => (
-              <RevealItem
-                as="li"
-                key={step.number}
-                index={index}
-                className="bg-card"
-              >
-                <div className="flex h-full gap-4 p-6 lg:p-7">
-                  <span className="font-mono text-xs text-muted-foreground/70">
+              <RevealItem as="li" key={step.number} index={index}>
+                <div className="group grid gap-x-8 gap-y-3 border-t border-white/12 py-8 sm:grid-cols-[auto_minmax(0,1fr)] lg:grid-cols-[10rem_minmax(0,22rem)_minmax(0,1fr)] lg:py-11">
+                  <span className="numeral text-5xl leading-none text-white/25 transition-colors duration-500 group-hover:text-brand lg:text-7xl">
                     {step.number}
                   </span>
-                  <div>
-                    <h3 className="text-base font-semibold">{step.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                      {step.detail}
-                    </p>
-                  </div>
+
+                  <h3 className="display-md text-paper">{step.title}</h3>
+
+                  <p className="max-w-md text-[15px] leading-relaxed text-white/55 sm:col-start-2 lg:col-start-3">
+                    {step.detail}
+                  </p>
                 </div>
               </RevealItem>
             ))}
           </ol>
+
+          <div className="border-t border-white/12" />
         </div>
       </section>
 
-      <section className="bg-background py-14 sm:py-20">
-        <div className="container-page grid gap-10 lg:grid-cols-12 lg:gap-16">
-          <div className="lg:col-span-5">
-            <h2 className="text-2xl">Good to know</h2>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+      {/* Good to know — the client's own LEGAL statements for this service,
+          reproduced verbatim from `service.disclaimers`. */}
+      <section className="bg-background py-20 sm:py-24 lg:py-32">
+        <div className="container-wide grid gap-12 lg:grid-cols-12 lg:gap-16">
+          <Reveal className="lg:col-span-5">
+            <p className="text-eyebrow">The fine print</p>
+            <h2 className="display-lg mt-4 text-ink-black">Good to know.</h2>
+            <p className="mt-5 max-w-sm text-sm leading-relaxed text-muted-foreground">
               These statements are VisaDrive&rsquo;s own terms and apply to this
               service.
             </p>
-          </div>
+          </Reveal>
+
           <div className="lg:col-span-7">
-            <ul className="space-y-4">
-              {service.disclaimers.map((statement) => (
-                <li key={statement} className="flex items-start gap-3">
-                  <Check className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
-                  <span className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+            <ol className="border-t border-ink-black/12">
+              {service.disclaimers.map((statement, index) => (
+                <RevealItem
+                  as="li"
+                  key={statement}
+                  index={index}
+                  className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-4 border-b border-ink-black/12 py-6 sm:grid-cols-[4rem_minmax(0,1fr)]"
+                >
+                  <span
+                    aria-hidden
+                    className="numeral text-xl leading-none text-ink-black/25 sm:text-2xl"
+                  >
+                    {pad(index + 1)}
+                  </span>
+                  <span className="max-w-prose text-[15px] leading-relaxed text-muted-foreground">
                     {statement}
                   </span>
-                </li>
+                </RevealItem>
               ))}
-            </ul>
+            </ol>
             <LegalNotes
-              className="mt-8"
+              className="mt-10"
               title="Also worth knowing"
               keys={["notAffiliated"]}
             />
@@ -158,38 +185,13 @@ export default async function ServicePage({
         </div>
       </section>
 
-      <section className="border-t border-border bg-surface py-14 sm:py-16">
-        <div className="container-page">
-          <h2 className="text-2xl">Other services</h2>
-          <ul className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {others.map((other, index) => {
-              return (
-                <RevealItem as="li" key={other.key} index={index}>
-                  <article className="group relative flex h-full flex-col rounded-2xl border border-border bg-card p-5 transition-shadow duration-300 hover:elev-md">
-                    <IconGlyph name={other.icon} className="size-5 text-brand" />
-                    <h3 className="mt-4 text-sm font-semibold">
-                      <Link
-                        href={`/services/${other.slug}`}
-                        className="rounded-sm after:absolute after:inset-0 after:content-[''] focus-brand"
-                      >
-                        {other.name}
-                      </Link>
-                    </h3>
-                    <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-                      {other.summary}
-                    </p>
-                    <p className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand">
-                      Learn more
-                      <ArrowRight
-                        className="size-3.5 transition-transform duration-300 group-hover:translate-x-0.5"
-                        aria-hidden
-                      />
-                    </p>
-                  </article>
-                </RevealItem>
-              );
-            })}
-          </ul>
+      <section className="bg-paper py-20 sm:py-24 lg:py-32">
+        <div className="container-wide">
+          <Reveal>
+            <p className="text-eyebrow">Keep reading</p>
+            <h2 className="display-lg mt-4 text-ink-black">Other services.</h2>
+          </Reveal>
+          <ServiceIndexList services={others} className="mt-12 lg:mt-16" />
         </div>
       </section>
 

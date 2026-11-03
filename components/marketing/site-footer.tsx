@@ -28,12 +28,19 @@ export function SiteFooter() {
   const year = useCurrentYear();
 
   return (
-    <footer className="border-t border-border bg-surface">
-      <div className="container-page py-14 sm:py-16">
-        <div className="grid gap-10 lg:grid-cols-12 lg:gap-8">
+    <footer className="bg-ink-black text-paper">
+      <div className="container-wide py-16 sm:py-20">
+        {/* A masthead line, the way a magazine signs off. */}
+        <p className="display-lg max-w-3xl text-paper">
+          Your next destination,
+          <br />
+          <span className="text-brand">handled properly.</span>
+        </p>
+
+        <div className="mt-14 grid gap-10 border-t border-white/12 pt-12 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-4">
-            <Logo size="lg" />
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            <Logo size="lg" onDark />
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/55">
               {settings.description}
             </p>
 
@@ -41,7 +48,7 @@ export function SiteFooter() {
               <li>
                 <a
                   href={`tel:+${phoneDigits(settings.phone)}`}
-                  className="inline-flex items-start gap-2.5 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-brand"
+                  className="inline-flex items-start gap-2.5 rounded-sm text-white/55 transition-colors hover:text-white focus-brand"
                 >
                   <Phone className="mt-0.5 size-4 shrink-0" aria-hidden />
                   <span>{settings.phoneDisplay}</span>
@@ -50,13 +57,13 @@ export function SiteFooter() {
               <li>
                 <a
                   href={`mailto:${settings.email}`}
-                  className="inline-flex items-start gap-2.5 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-brand"
+                  className="inline-flex items-start gap-2.5 rounded-sm text-white/55 transition-colors hover:text-white focus-brand"
                 >
                   <Mail className="mt-0.5 size-4 shrink-0" aria-hidden />
                   <span className="break-all">{settings.email}</span>
                 </a>
               </li>
-              <li className="inline-flex items-start gap-2.5 text-muted-foreground">
+              <li className="inline-flex items-start gap-2.5 text-white/55">
                 <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
                 <span>{settings.address}</span>
               </li>
@@ -69,7 +76,7 @@ export function SiteFooter() {
             <nav aria-labelledby="footer-destinations">
               <h2
                 id="footer-destinations"
-                className="text-sm font-semibold text-foreground"
+                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40"
               >
                 Destinations
               </h2>
@@ -109,16 +116,16 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="mt-12 space-y-3 border-t border-border pt-8">
-          <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+        <div className="mt-14 space-y-3 border-t border-white/12 pt-8">
+          <p className="max-w-3xl text-xs leading-relaxed text-white/40">
             {LEGAL.notAffiliated}
           </p>
-          <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+          <p className="max-w-3xl text-xs leading-relaxed text-white/40">
             {LEGAL.noGuarantee}
           </p>
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-8 flex flex-col gap-3 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
           <p>
             © {year ? `${year} ` : ""}
             {settings.companyName}. All rights reserved.
@@ -140,7 +147,7 @@ function FooterColumn({
   const id = `footer-${title.toLowerCase()}`;
   return (
     <nav aria-labelledby={id}>
-      <h2 id={id} className="text-sm font-semibold text-foreground">
+      <h2 id={id} className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
         {title}
       </h2>
       <ul className="mt-4 space-y-3 text-sm">
@@ -158,7 +165,7 @@ function FooterLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-brand"
+      className="rounded-sm text-white/65 transition-colors hover:text-white focus-brand"
     >
       {label}
     </Link>

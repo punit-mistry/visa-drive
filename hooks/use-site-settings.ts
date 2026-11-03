@@ -36,7 +36,14 @@ export function useSiteSettings() {
       Array.isArray(rawTestimonials)
         ? rawTestimonials
         : ((rawTestimonials as { items?: unknown } | null | undefined)?.items ?? [])
-    ) as Array<{ quote: string; name: string; context?: string; isDemo?: boolean }>;
+    ) as Array<{
+      quote: string;
+      name: string;
+      context?: string;
+      /** A real, consented customer photo when the client has one. */
+      avatarUrl?: string;
+      isDemo?: boolean;
+    }>;
 
     return {
       isLoading: settings === undefined,

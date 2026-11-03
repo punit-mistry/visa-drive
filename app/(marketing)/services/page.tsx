@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { FaqSection } from "@/components/marketing/faq-section";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { LegalNotes } from "@/components/marketing/legal-notes";
+import { FadeIn } from "@/components/marketing/reveal";
 import { ServicesSection } from "@/components/marketing/services-section";
 import { EXISTING_SERVICES } from "@/lib/constants/site";
 
@@ -15,26 +16,40 @@ export const metadata: Metadata = {
 export default function ServicesPage() {
   return (
     <>
-      <section className="border-b border-border bg-background">
-        <div className="container-page py-12 sm:py-16 lg:py-20">
-          <div className="max-w-2xl">
-            <p className="text-eyebrow">Services</p>
-            <h1 className="mt-3 text-4xl sm:text-5xl">
-              What VisaDrive actually does
-            </h1>
-            <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-              {EXISTING_SERVICES.length} service lines, built around the parts of
-              a visa application that most often go wrong: the form, the
-              appointment and the interview.
-            </p>
-          </div>
+      <section className="bg-ink-black py-20 text-paper sm:py-24 lg:py-32">
+        <div className="container-wide">
+          <FadeIn className="grid gap-10 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-8">
+              <p className="text-eyebrow-dark">Services</p>
+              <h1 className="display-xl mt-4 text-paper">
+                What VisaDrive
+                <br />
+                actually does.
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-relaxed text-white/55 sm:text-lg">
+                {EXISTING_SERVICES.length} service lines, built around the
+                parts of a visa application that most often go wrong: the form,
+                the appointment and the interview.
+              </p>
+            </div>
+
+            <div
+              aria-hidden
+              className="flex items-end gap-4 border-t border-white/12 pt-6 lg:col-span-4 lg:justify-end lg:border-t-0 lg:pt-0"
+            >
+              <span className="numeral text-7xl leading-none text-white/25 sm:text-8xl lg:text-9xl">
+                {String(EXISTING_SERVICES.length).padStart(2, "0")}
+              </span>
+              <span className="text-eyebrow-dark pb-2">Service lines</span>
+            </div>
+          </FadeIn>
         </div>
       </section>
 
       <ServicesSection showIntro={false} tone="surface" />
 
-      <section className="bg-background py-12 sm:py-14">
-        <div className="container-page">
+      <section className="bg-background py-16 sm:py-20">
+        <div className="container-wide">
           <LegalNotes
             title="What we can and cannot promise"
             keys={[

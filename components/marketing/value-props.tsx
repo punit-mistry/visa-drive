@@ -1,5 +1,6 @@
 import { RevealItem } from "@/components/marketing/reveal";
 import { Section, SectionIntro } from "@/components/marketing/section";
+import type { SectionTone } from "@/components/marketing/section";
 import { IconTile } from "@/components/marketing/icon";
 import { VALUE_PROPS } from "@/lib/constants/site";
 
@@ -10,7 +11,7 @@ import { VALUE_PROPS } from "@/lib/constants/site";
 export function ValueProps({
   tone = "default",
 }: {
-  tone?: "default" | "surface";
+  tone?: SectionTone;
 }) {
   return (
     <Section tone={tone}>

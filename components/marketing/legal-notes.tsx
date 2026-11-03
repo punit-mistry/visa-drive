@@ -46,19 +46,19 @@ export function LegalNotes({
   return (
     <aside
       className={cn(
-        "rounded-2xl border border-border bg-surface p-5 sm:p-6",
+        "rounded-2xl border border-border bg-paper p-5 sm:p-6",
         className,
       )}
     >
-      <h2 className="flex items-center gap-2 text-sm font-semibold">
+      <h2 className="text-eyebrow flex items-center gap-2 text-foreground">
         <Scale className="size-4 text-brand" aria-hidden />
         {title}
       </h2>
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-4 space-y-3">
         {statements.map((statement) => (
           <li
             key={statement}
-            className="max-w-3xl text-sm leading-relaxed text-muted-foreground"
+            className="max-w-3xl text-sm leading-relaxed text-foreground/80"
           >
             {statement}
           </li>
