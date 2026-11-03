@@ -116,13 +116,20 @@ http.route({
     try {
       // Svix verifies the signature AND the timestamp, which is what makes a
       // captured payload unusable as a replay.
-      event = new Webhook(secret).verify(
-        payload,
-        headers,
-      ) as unknown as ClerkWebhookEvent;
+      //
+      // svix v2's `verify()` only *checks* the request - it does not return
+      // the parsed body any more, so the payload is parsed separately below.
+      new Webhook(secret).verify(payload, headers);
     } catch (error) {
       console.error("[clerk-webhook] signature verification failed", error);
       return new Response("Invalid signature", { status: 400 });
+    }
+
+    try {
+      event = JSON.parse(payload) as ClerkWebhookEvent;
+    } catch (error) {
+      console.error("[clerk-webhook] body was not JSON", error);
+      return new Response("Invalid payload", { status: 400 });
     }
 
     const data = event.data ?? {};
