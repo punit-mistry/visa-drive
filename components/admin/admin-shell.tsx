@@ -11,11 +11,13 @@ import {
   CreditCard,
   FileText,
   LayoutDashboard,
+  Loader2,
   Menu,
   MessageSquare,
   Settings,
   ShieldCheck,
   Users,
+  X,
 } from "lucide-react";
 
 import { Logo } from "@/components/shared/logo";
@@ -86,8 +88,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
-        <p className="text-sm text-muted-foreground">Checking access...</p>
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+        <p className="text-sm text-muted-foreground">Checking your access…</p>
       </div>
     );
   }
@@ -125,66 +128,110 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
         ) : (
           <div className="min-h-screen bg-surface">
-            <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur">
-              <div className="flex h-16 items-center gap-4 px-4 lg:px-6">
-                <div className="flex items-center gap-3">
-                  <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-                    <SheetTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="lg:hidden"
-                        aria-label="Open admin menu"
-                      >
-                        <Menu className="size-5" aria-hidden />
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="w-[min(18rem,88vw)] gap-0 p-0">
-                      <SheetHeader className="border-b border-border">
-                        <SheetTitle asChild>
-                          <span>
-                            <Logo size="md" asLink={false} />
-                          </span>
-                        </SheetTitle>
-                        <SheetDescription className="sr-only">
-                          Admin navigation
-                        </SheetDescription>
-                      </SheetHeader>
-                      <nav aria-label="Admin" className="flex-1 overflow-y-auto p-4">
-                        <AdminNav
-                          groups={navGroupsWithItems}
-                          pathname={pathname}
-                          onNavigate={() => setMobileOpen(false)}
-                        />
-                      </nav>
-                    </SheetContent>
-                  </Sheet>
+            {/* Mobile header */}
+            <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:hidden">
+              <div className="flex items-center gap-3">
+                <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Open admin menu"
+                    >
+                      <Menu className="size-5" aria-hidden />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-[min(18rem,88vw)] gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground">
+                    <SheetHeader className="border-b border-sidebar-border">
+                      <SheetTitle asChild>
+                        <span className="flex items-center justify-between">
+                          <Logo size="md" asLink={false} />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-sidebar-foreground hover:bg-sidebar-accent"
+                            onClick={() => setMobileOpen(false)}
+                            aria-label="Close menu"
+                          >
+                            <X className="size-4" aria-hidden />
+                          </Button>
+                        </span>
+                      </SheetTitle>
+                      <SheetDescription className="sr-only">
+                        Admin navigation
+                      </SheetDescription>
+                    </SheetHeader>
+                    <nav aria-label="Admin" className="flex-1 overflow-y-auto p-4">
+                      <AdminNav
+                        groups={navGroupsWithItems}
+                        pathname={pathname}
+                        onNavigate={() => setMobileOpen(false)}
+                        dark
+                      />
+                    </nav>
+                    <div className="border-t border-sidebar-border p-4 text-xs text-sidebar-foreground/70">
+                      Signed in as {user?.fullName ?? "Staff"}
+                    </div>
+                  </SheetContent>
+                </Sheet>
+                <Logo size="md" href="/admin" />
+              </div>
+              <UserButton
+                appearance={{ elements: { avatarBox: "size-8" } }}
+                userProfileUrl="/dashboard/profile"
+              />
+            </header>
+
+            <div className="flex min-h-screen">
+              {/* Desktop sidebar */}
+              <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:block">
+                <div className="sticky top-0 flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
                   <Logo size="md" href="/admin" />
-                  <span className="hidden rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-medium text-brand-deep sm:inline">
-                    Admin CRM
+                  <span className="rounded-full bg-sidebar-accent px-2 py-0.5 text-[11px] font-medium text-sidebar-foreground">
+                    Admin
                   </span>
                 </div>
-                <div className="flex flex-1 items-center justify-end gap-3">
-                  <div className="hidden text-right sm:block">
-                    <p className="text-sm font-medium">{user?.fullName ?? "Staff"}</p>
-                    <p className="text-xs capitalize text-muted-foreground">
-                      {(user?.role ?? "").replace("_", " ")}
+                <nav className="scrollbar-thin max-h-[calc(100vh-4rem)] space-y-6 overflow-y-auto p-4">
+                  <AdminNav groups={navGroupsWithItems} pathname={pathname} dark />
+                </nav>
+                <div className="border-t border-sidebar-border p-4">
+                  <div className="flex items-center gap-3">
+                    <UserButton
+                      appearance={{ elements: { avatarBox: "size-8" } }}
+                      userProfileUrl="/dashboard/profile"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-sidebar-foreground">
+                        {user?.fullName ?? "Staff"}
+                      </p>
+                      <p className="truncate text-xs capitalize text-sidebar-foreground/60">
+                        {(user?.role ?? "").replace("_", " ")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
+              <div className="flex min-w-0 flex-1 flex-col">
+                <header className="sticky top-0 z-20 hidden h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur lg:flex">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      VisaDrive CRM
+                    </p>
+                    <p className="text-sm font-medium text-foreground">
+                      {navGroupsWithItems
+                        .flatMap((g) => g.items)
+                        .find((i) => isActive(pathname, i.href))?.label ?? "Dashboard"}
                     </p>
                   </div>
-                  <UserButton
-                    appearance={{ elements: { avatarBox: "size-8" } }}
-                    userProfileUrl="/dashboard/profile"
-                  />
-                </div>
+                  <div className="flex items-center gap-3">
+                    <Button asChild variant="ghost" size="sm">
+                      <Link href="/">View site</Link>
+                    </Button>
+                  </div>
+                </header>
+                <main className="min-w-0 flex-1 p-4 lg:p-6">{children}</main>
               </div>
-            </header>
-            <div className="flex">
-              <aside className="hidden w-64 shrink-0 border-r border-border bg-background lg:flex lg:flex-col">
-                <nav className="flex-1 space-y-6 overflow-y-auto p-4">
-                  <AdminNav groups={navGroupsWithItems} pathname={pathname} />
-                </nav>
-              </aside>
-              <main className="min-w-0 flex-1 p-4 lg:p-6">{children}</main>
             </div>
           </div>
         )}
@@ -200,16 +247,23 @@ function AdminNav({
   groups,
   pathname,
   onNavigate,
+  dark = false,
 }: {
   groups: AdminNavGroup[];
   pathname: string;
   onNavigate?: () => void;
+  dark?: boolean;
 }) {
   return (
     <>
       {groups.map((group) => (
         <div key={group.label}>
-          <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p
+            className={cn(
+              "mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em]",
+              dark ? "text-sidebar-foreground/50" : "text-muted-foreground/80",
+            )}
+          >
             {group.label}
           </p>
           <div className="space-y-1">
@@ -223,13 +277,30 @@ function AdminNav({
                   aria-current={active ? "page" : undefined}
                   onClick={onNavigate}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors focus-brand",
-                    active
-                      ? "bg-surface text-foreground"
-                      : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                    "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors focus-brand",
+                    dark
+                      ? active
+                        ? "bg-sidebar-accent text-sidebar-foreground"
+                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                      : active
+                        ? "bg-brand-tint text-brand-deep"
+                        : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                    active && "ring-1 ring-sidebar-border",
                   )}
                 >
-                  <Icon className="size-4" aria-hidden />
+                  <Icon
+                    className={cn(
+                      "size-4 transition-colors",
+                      dark
+                        ? active
+                          ? "text-sidebar-primary"
+                          : "text-sidebar-foreground/60 group-hover:text-sidebar-foreground"
+                        : active
+                          ? "text-brand"
+                          : "text-muted-foreground group-hover:text-foreground",
+                    )}
+                    aria-hidden
+                  />
                   {item.label}
                 </Link>
               );

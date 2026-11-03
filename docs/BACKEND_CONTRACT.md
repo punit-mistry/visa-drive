@@ -87,7 +87,7 @@ same change.
 | --- | --- | --- |
 | `createDraft` | mutation | `{ visaProductId, travellerCount }` → `{ applicationId, referenceId }`. |
 | `saveDraftStep` | mutation | Autosave. `{ applicationId, step, patch }`. Owner only. |
-| `getDraft` | query | Owner only. Full wizard state. |
+| `getDraft` | query | Owner only. Full wizard state: application + applicants + documents + product + requirements + destination. |
 | `listMyDrafts` | query | Owner only. |
 | `submit` | mutation | Validates completeness, freezes `pricing`, writes `statusHistory`, notifies. |
 | `listMine` | query | Paginated. Owner only. |

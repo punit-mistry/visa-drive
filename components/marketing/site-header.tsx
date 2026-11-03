@@ -23,22 +23,34 @@ import { phoneDigits } from "@/lib/helpers/format";
 import { cn } from "@/lib/utils";
 
 /**
- * Slim, white, sticky. The bottom hairline only appears once the page has
- * moved, so the header sits flush against the hero on load and gains a
- * boundary exactly when it starts overlapping content.
+ * Marketing header.
+ *
+ * On the homepage it starts transparent and sits inside the cinematic hero,
+ * then resolves into a blurred dark bar once the page has moved — so the
+ * photograph owns the first screen and the chrome only asserts itself when it
+ * starts overlapping content. Every other route has no dark hero to sit in,
+ * so the bar is solid from the first paint rather than flashing white type
+ * onto a white page.
  */
 export function SiteHeader() {
   const pathname = usePathname();
   const settings = useSiteSettings();
   const [scrolled, setScrolled] = useState(false);
-  const [drawer, setDrawer] = useState<{ pathname: string; open: boolean } | null>(null);
+  const [drawer, setDrawer] = useState<{ pathname: string; open: boolean } | null>(
+    null,
+  );
+
+  const hasCinematicHero = pathname === "/";
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 24);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  /** True while the bar is floating over the hero photograph. */
+  const onDark = hasCinematicHero && !scrolled;
 
   // A drawer left open across a navigation traps the visitor on the new page.
   // Keying the open flag to the pathname closes it automatically on navigation
@@ -51,20 +63,28 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full bg-background/95 backdrop-blur-sm transition-shadow duration-200",
-        scrolled ? "border-b border-border" : "border-b border-transparent",
+        "top-0 z-50 w-full transition-[background-color,border-color,backdrop-filter] duration-500",
+        // Fixed only where there is a dark hero to float over. Everywhere
+        // else it is sticky, so it occupies flow and no page has to
+        // compensate with a magic top padding.
+        hasCinematicHero ? "fixed" : "sticky",
+        onDark
+          ? "border-b border-transparent bg-transparent"
+          : hasCinematicHero
+            ? "border-b border-white/10 bg-ink-black/80 backdrop-blur-md"
+            : "border-b border-border bg-background/95 backdrop-blur-sm",
       )}
     >
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:elev-md"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:elev-md"
       >
         Skip to content
       </a>
 
-      <div className="container-page flex h-16 items-center justify-between gap-4">
-        <div className="flex items-center gap-8">
-          <Logo size="md" />
+      <div className="container-wide flex h-20 items-center justify-between gap-4">
+        <div className="flex items-center gap-10">
+          <Logo size="md" onDark={hasCinematicHero} />
 
           <nav aria-label="Main" className="hidden lg:block">
             <ul className="flex items-center gap-1">
@@ -74,10 +94,14 @@ export function SiteHeader() {
                     href={item.href}
                     aria-current={isActive(item.href) ? "page" : undefined}
                     className={cn(
-                      "rounded-md px-3 py-2 text-sm font-medium transition-colors focus-brand",
-                      isActive(item.href)
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
+                      "rounded-md px-3 py-2 text-[13px] font-medium tracking-wide transition-colors focus-brand",
+                      hasCinematicHero
+                        ? isActive(item.href)
+                          ? "text-white"
+                          : "text-white/60 hover:text-white"
+                        : isActive(item.href)
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     {item.label}
@@ -91,23 +115,46 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <a
             href={`tel:+${phoneDigits(settings.phone)}`}
-            className="hidden items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-brand xl:inline-flex"
+            className={cn(
+              "hidden items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition-colors focus-brand xl:inline-flex",
+              hasCinematicHero
+                ? "text-white/60 hover:text-white"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
             <Phone className="size-4" aria-hidden />
             {settings.phoneDisplay}
           </a>
 
           <Show when="signed-out">
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "hidden sm:inline-flex",
+                hasCinematicHero &&
+                  "text-white/70 hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
+              )}
+            >
               <Link href="/sign-in">Sign in</Link>
             </Button>
-            <Button asChild size="sm">
-              <Link href="/destinations">Start application</Link>
+            <Button asChild size="sm" className="font-semibold">
+              <Link href="/destinations">Start your journey</Link>
             </Button>
           </Show>
 
           <Show when="signed-in">
-            <Button asChild size="sm" variant="outline" className="hidden sm:inline-flex">
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className={cn(
+                "hidden sm:inline-flex",
+                hasCinematicHero &&
+                  "border-white/30 bg-white/5 text-white hover:border-white/50 hover:bg-white/10 hover:text-white dark:border-white/30 dark:bg-white/5",
+              )}
+            >
               <Link href="/dashboard">My dashboard</Link>
             </Button>
             <UserButton
@@ -124,7 +171,11 @@ export function SiteHeader() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden"
+                className={cn(
+                  "lg:hidden",
+                  hasCinematicHero &&
+                    "text-white hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
+                )}
                 aria-label="Open menu"
               >
                 <Menu className="size-5" aria-hidden />
@@ -169,7 +220,7 @@ export function SiteHeader() {
                 <Show when="signed-out">
                   <SheetClose asChild>
                     <Button asChild className="w-full">
-                      <Link href="/destinations">Start application</Link>
+                      <Link href="/destinations">Start your journey</Link>
                     </Button>
                   </SheetClose>
                   <SheetClose asChild>

@@ -56,6 +56,7 @@ export function CountryImage({
   className,
   sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 400px",
   priority = false,
+  fallbackTone = "light",
 }: {
   src?: string | null;
   countryCode?: string | null;
@@ -64,6 +65,12 @@ export function CountryImage({
   className?: string;
   sizes?: string;
   priority?: boolean;
+  /**
+   * The poster card lays white type over this surface, so its fallback has
+   * to be dark — a light panel there would leave the country name unreadable
+   * for any destination an admin has not given a photo.
+   */
+  fallbackTone?: "light" | "dark";
 }) {
   const candidate =
     (isAllowedImageUrl(src) ? src : undefined) ??
@@ -73,7 +80,13 @@ export function CountryImage({
   const showImage = Boolean(candidate) && !failed;
 
   return (
-    <div className={cn("relative overflow-hidden bg-surface-strong", className)}>
+    <div
+      className={cn(
+        "relative overflow-hidden",
+        fallbackTone === "dark" ? "bg-ink" : "bg-surface-strong",
+        className,
+      )}
+    >
       {showImage ? (
         <Image
           src={candidate as string}
@@ -87,10 +100,20 @@ export function CountryImage({
       ) : (
         <div
           aria-hidden
-          className="flex h-full w-full flex-col items-center justify-center gap-2 bg-surface-strong"
+          className={cn(
+            "flex h-full w-full flex-col items-center justify-center gap-2",
+            fallbackTone === "dark" ? "bg-ink" : "bg-surface-strong",
+          )}
         >
-          <span className="text-4xl leading-none">{flagEmoji ?? "✈"}</span>
-          <span className="text-eyebrow text-muted-foreground/80">{name}</span>
+          <span className="text-4xl leading-none opacity-90">{flagEmoji ?? "✈"}</span>
+          <span
+            className={cn(
+              "text-eyebrow",
+              fallbackTone === "dark" ? "text-white/45" : "text-muted-foreground/80",
+            )}
+          >
+            {name}
+          </span>
         </div>
       )}
     </div>

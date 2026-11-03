@@ -5,80 +5,93 @@
 
 /* ============================================================
    VisaDrive Design System
-   Premium SaaS palette: midnight navy type, deep/electric blue
-   actions and a restrained indigo accent on clean light surfaces.
-   Blue is reserved for actions, links and active states — never
-   a full-page wash.
+   Palette derived from the real VisaDrive logo: signal red
+   #D82828 over ink charcoal on warm white. Red is reserved for
+   actions, active state and the brand mark — never a background
+   wash, never a gradient field.
    ============================================================ */
 
 :root {
   --radius: 0.625rem;
 
   /* --- Brand ------------------------------------------------ */
-  --brand: #3867f4;            /* Electric blue — links, focus, accents */
-  --brand-strong: #245bdb;     /* Deep blue — primary actions */
-  --brand-deep: #1d46b0;
-  --brand-soft: #dfe9ff;
-  --brand-tint: #f0f5ff;
+  --brand: #d82828;            /* Signal red — brand mark, accents, focus */
+  --brand-strong: #c62222;     /* Primary actions */
+  --brand-deep: #a81a1a;       /* Pressed / hover */
+  --brand-soft: #fbdcdc;
+  --brand-tint: #fef4f4;
   --brand-foreground: #ffffff;
-  --navy: #101828;             /* Midnight navy — headline type */
-  --indigo: #6955e8;
+  --ink: #17141a;              /* Charcoal — headline type */
+  /* Cinematic editorial surfaces. Used by the marketing site only; the
+     portal and CRM stay on white so they read as working tools. */
+  --ink-black: #0a0a0a;
+  --charcoal: #151515;
+  --graphite: #222222;
+  --paper: #f5f3ef;            /* Warm off-white for editorial sections */
+  --ember: #e4572e;            /* Secondary warm accent, used sparingly */
+  /* Kept distinct from the brand red so an in-progress status never
+     reads as a call to action. Used by TONE_CLASSES "progress". */
+  --navy: #2b4a9b;
 
   /* --- Surfaces --------------------------------------------- */
   --background: #ffffff;
-  --foreground: #101828;
+  --foreground: #17141a;
   --card: #ffffff;
-  --card-foreground: #101828;
+  --card-foreground: #17141a;
   --popover: #ffffff;
-  --popover-foreground: #101828;
-  --surface: #f7f9fc;
-  --surface-strong: #eef2f8;
+  --popover-foreground: #17141a;
+  --surface: #faf9fa;
+  --surface-strong: #f2f0f3;
 
   /* --- Semantic --------------------------------------------- */
-  --primary: #245bdb;
+  --primary: #c62222;
   --primary-foreground: #ffffff;
-  --secondary: #eef2f8;
-  --secondary-foreground: #182230;
-  --muted: #eef2f8;
-  --muted-foreground: #667085;
-  --accent: #f0f5ff;
-  --accent-foreground: #245bdb;
-  --destructive: #d92d20;
+  --secondary: #f2f0f3;
+  --secondary-foreground: #2a2530;
+  --muted: #f2f0f3;
+  --muted-foreground: #716d78;
+  --accent: #fef4f4;
+  --accent-foreground: #c62222;
+  /* Deliberately a deeper crimson than the brand red, so a delete
+     button never reads as the primary action. */
+  --destructive: #b42318;
   --destructive-foreground: #ffffff;
 
-  --border: #e5eaf2;
-  --border-strong: #d3ddea;
-  --input: #e5eaf2;
-  --ring: #3867f4;
+  --border: #e7e5ea;
+  --border-strong: #d8d4dc;
+  --input: #e7e5ea;
+  --ring: #d82828;
 
   /* --- Status ----------------------------------------------- */
-  --success: #039855;
+  --success: #0e9f6e;
   --success-foreground: #ffffff;
-  --success-soft: #e7f6ee;
-  --warning: #dc6803;
+  --success-soft: #e6f6f0;
+  --warning: #d97706;
   --warning-foreground: #ffffff;
-  --warning-soft: #fdf2e3;
-  --info: #245bdb;
+  --warning-soft: #fdf3e5;
+  /* Informational state is blue so it can never be confused with
+     the brand red or with a destructive action. */
+  --info: #2b4a9b;
   --info-foreground: #ffffff;
-  --info-soft: #f0f5ff;
+  --info-soft: #eef2fb;
 
   /* --- Charts ----------------------------------------------- */
-  --chart-1: #3867f4;
-  --chart-2: #6955e8;
-  --chart-3: #039855;
-  --chart-4: #dc6803;
-  --chart-5: #667085;
-  --chart-6: #101828;
+  --chart-1: #d82828;
+  --chart-2: #2b4a9b;
+  --chart-3: #0e9f6e;
+  --chart-4: #d97706;
+  --chart-5: #716d78;
+  --chart-6: #17141a;
 
-  /* --- Sidebar (admin shell) -------------------------------- */
-  --sidebar: #101828;
-  --sidebar-foreground: #d3ddea;
-  --sidebar-primary: #3867f4;
+  /* --- Sidebar (admin shell / auth panel) ------------------- */
+  --sidebar: #17141a;
+  --sidebar-foreground: #d8d4dc;
+  --sidebar-primary: #d82828;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #182230;
-  --sidebar-accent-foreground: #f7f9fc;
-  --sidebar-border: #233047;
-  --sidebar-ring: #3867f4;
+  --sidebar-accent: #241f2a;
+  --sidebar-accent-foreground: #faf9fa;
+  --sidebar-border: #312b38;
+  --sidebar-ring: #d82828;
 }
 
 .dark {
@@ -91,15 +104,21 @@
   --surface: oklch(19.75% 0.0127 307.75);
   --surface-strong: oklch(23% 0.016 304);
 
-  --brand: #7ea2ff;
-  --brand-strong: #9db9ff;
-  --brand-deep: #5f86f5;
-  --brand-soft: #1d2c4d;
-  --brand-tint: #16223c;
-  --indigo: #a79bff;
+  --brand: #ff6b6b;
+  --brand-strong: #ff7f7f;
+  --brand-deep: #e85555;
+  --brand-soft: #4a1f1f;
+  --brand-tint: #2e1818;
+  --ink: oklch(94% 0.004 303);
+  --ink-black: #0a0a0a;
+  --charcoal: #151515;
+  --graphite: #222222;
+  --paper: oklch(22% 0.014 305);
+  --ember: #ff8a5c;
+  --navy: #7d9cf0;
 
-  --primary: #7ea2ff;
-  --primary-foreground: #0d1526;
+  --primary: #ff6b6b;
+  --primary-foreground: #2a0f0f;
   --secondary: oklch(25.24% 0.0194 303.24);
   --secondary-foreground: oklch(94% 0.004 303);
   --muted: oklch(25.24% 0.0194 303.24);
@@ -112,30 +131,30 @@
   --border: oklch(28% 0.018 303);
   --border-strong: oklch(35% 0.02 303);
   --input: oklch(28% 0.018 303);
-  --ring: #7ea2ff;
+  --ring: #ff6b6b;
 
   --success: oklch(68% 0.13 162);
   --success-soft: oklch(26% 0.05 162);
   --warning: oklch(72% 0.15 62);
   --warning-soft: oklch(27% 0.06 62);
-  --info: oklch(62% 0.19 263);
+  --info: oklch(66% 0.14 263);
   --info-soft: oklch(26% 0.06 263);
 
-  --chart-1: #7ea2ff;
-  --chart-2: #a79bff;
+  --chart-1: #ff6b6b;
+  --chart-2: oklch(66% 0.14 263);
   --chart-3: oklch(68% 0.13 162);
   --chart-4: oklch(72% 0.15 62);
   --chart-5: oklch(70.28% 0.0164 302.44);
-  --chart-6: oklch(66% 0.14 320);
+  --chart-6: oklch(86% 0.01 303);
 
   --sidebar: oklch(13.5% 0.009 308);
   --sidebar-foreground: oklch(86.54% 0.0114 303.09);
-  --sidebar-primary: #7ea2ff;
-  --sidebar-primary-foreground: #0d1526;
+  --sidebar-primary: #ff6b6b;
+  --sidebar-primary-foreground: #2a0f0f;
   --sidebar-accent: oklch(22% 0.015 304);
   --sidebar-accent-foreground: oklch(97% 0 0);
   --sidebar-border: oklch(24% 0.016 303);
-  --sidebar-ring: #7ea2ff;
+  --sidebar-ring: #ff6b6b;
 }
 
 @theme inline {
@@ -165,8 +184,13 @@
   --color-brand-soft: var(--brand-soft);
   --color-brand-tint: var(--brand-tint);
   --color-brand-foreground: var(--brand-foreground);
+  --color-ink: var(--ink);
+  --color-ink-black: var(--ink-black);
+  --color-charcoal: var(--charcoal);
+  --color-graphite: var(--graphite);
+  --color-paper: var(--paper);
+  --color-ember: var(--ember);
   --color-navy: var(--navy);
-  --color-indigo: var(--indigo);
 
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
@@ -199,8 +223,8 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
-  --font-display: var(--font-playfair), ui-serif, Georgia, serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-display: var(--font-instrument), ui-serif, Georgia, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --radius-xs: calc(var(--radius) - 6px);
@@ -275,6 +299,80 @@
     @apply text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground;
   }
 
+  /* ---------------------------------------------------------------
+     Editorial display type.
+     The serif carries emotion, so its sizes are fluid rather than
+     stepped — a magazine headline should fill its measure at every
+     width instead of jumping at three breakpoints.
+     --------------------------------------------------------------- */
+  .display-hero {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(3rem, 10.5vw, 9rem);
+    line-height: 0.92;
+    letter-spacing: -0.028em;
+  }
+
+  .display-xl {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(2.5rem, 6.5vw, 5.25rem);
+    line-height: 0.98;
+    letter-spacing: -0.022em;
+  }
+
+  .display-lg {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(2rem, 4.6vw, 3.5rem);
+    line-height: 1.04;
+    letter-spacing: -0.018em;
+  }
+
+  .display-md {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(1.625rem, 3vw, 2.5rem);
+    line-height: 1.1;
+    letter-spacing: -0.014em;
+  }
+
+  /* Oversized step numerals on the journey and services sections. */
+  .numeral {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  /* Eyebrow on dark sections, where muted-foreground is unreadable. */
+  .text-eyebrow-dark {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-white/45;
+  }
+
+  /* A rule that draws itself in on hover — used on editorial links. */
+  .link-rule {
+    @apply relative inline-flex items-center gap-2;
+  }
+
+  .link-rule::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -4px;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .link-rule:hover::after,
+  .link-rule:focus-visible::after {
+    transform: scaleX(1);
+  }
+
   .focus-brand {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
@@ -320,6 +418,27 @@
 
   .animate-success-pop {
     animation: vd-success-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* The hero's passport paper: a faint fibrous tint, not a gradient
+     field. Two tiny repeating washes, both under 4% opacity. */
+  .passport-paper {
+    background-color: var(--surface);
+    background-image:
+      repeating-linear-gradient(
+        115deg,
+        rgb(23 20 26 / 0.022) 0px,
+        rgb(23 20 26 / 0.022) 1px,
+        transparent 1px,
+        transparent 7px
+      ),
+      repeating-linear-gradient(
+        -115deg,
+        rgb(23 20 26 / 0.016) 0px,
+        rgb(23 20 26 / 0.016) 1px,
+        transparent 1px,
+        transparent 9px
+      );
   }
 }
 

@@ -24,6 +24,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FileDropzone } from "@/components/shared/file-dropzone";
 import { StatusTimeline } from "@/components/shared/status-timeline";
+import { ApplicationProgress } from "@/components/customer/application-progress";
 import { DetailSkeleton, EmptyState, ErrorState } from "@/components/shared/states";
 import { useDocumentUpload } from "@/hooks/use-document-upload";
 import { formatDate, formatDateTime, fullName, maskPassport } from "@/lib/helpers/format";
@@ -122,12 +123,7 @@ export default function ApplicationDetailPage() {
         }
       />
 
-      {(application.status === "documents_pending" ||
-        application.status === "additional_documents_requested") && (
-        <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-warning">
-          {config.description}
-        </div>
-      )}
+      <ApplicationProgress status={application.status} />
 
       <div className="flex flex-wrap items-center gap-2">
         <ApplicationStatusBadge status={application.status} audience="customer" />

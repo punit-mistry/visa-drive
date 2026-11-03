@@ -65,10 +65,19 @@ Epoch milliseconds. Display via `lib/helpers/format.ts`, which renders in
 ## Design system
 
 Tokens live in `app/globals.css`. The palette is derived from the real
-VisaDrive logo: signal red `#D82828`, ink charcoal `#201820`, navy `#2B4A9B`.
+VisaDrive logo: signal red `#D82828`, primary action `#C62222`, ink charcoal
+`#17141A`, on warm white `#FAF9FA` surfaces.
 
-- Red is a **signal** colour — CTAs, active state, brand marks. Never a
-  background wash, never a gradient field.
+- Red is a **signal** colour — CTAs, links, focus, active state and the brand
+  mark. Never a background wash, never a gradient field, never a full-page tint.
+- `--destructive` is a deeper crimson `#B42318`, deliberately distinct from the
+  brand red so a delete button never reads as the primary action. `--navy`
+  `#2B4A9B` carries the "progress" status tone for the same reason.
+- The Clerk appearance block in `app/layout.tsx`, the email accents in
+  `lib/notifications/templates.ts` and the Razorpay checkout theme in
+  `lib/payments/razorpay.ts` each carry their own copy of these hex values,
+  because those surfaces render outside our CSS. Change the palette and all
+  three have to move with it.
 - White-dominant, high contrast, generous whitespace, hairline borders,
   restrained shadows (`elev-sm` … `elev-xl`).
 - Use semantic tokens (`bg-card`, `text-muted-foreground`, `border-border`),

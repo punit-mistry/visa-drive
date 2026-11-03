@@ -66,6 +66,7 @@ export function PopularDestinations({ limit = 6 }: { limit?: number }) {
                     name: destination.name,
                     countryCode: destination.countryCode,
                     flagEmoji: destination.flagEmoji,
+                    region: destination.region,
                     tagline: destination.tagline,
                     summary: destination.summary,
                     cardImageUrl: destination.cardImageUrl,

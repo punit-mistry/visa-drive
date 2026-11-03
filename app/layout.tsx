@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Instrument_Serif, Manrope } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 
 import { ConvexClientProvider } from "@/components/providers/convex-client-provider";
@@ -10,17 +10,23 @@ import { SITE } from "@/lib/constants/site";
 
 import "./globals.css";
 
-const inter = Inter({
+/**
+ * Editorial pairing: a high-contrast serif carries the display type, a
+ * humanist sans carries everything functional — navigation, forms, tables and
+ * the whole of the portal and CRM. The serif never appears in UI chrome.
+ */
+const manrope = Manrope({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-manrope",
   display: "swap",
 });
 
-const playfair = Playfair_Display({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
-  variable: "--font-playfair",
+  variable: "--font-instrument",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
+  weight: ["400"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -68,7 +74,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#141017" },
+    { media: "(prefers-color-scheme: dark)", color: "#17141a" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -84,17 +90,17 @@ export default function RootLayout({
       publishableKey={clerkPublishableKey}
       appearance={{
         variables: {
-          // Clerk's own token names. Kept in sync with the brand palette in
-          // globals.css so its hosted forms match the rest of the product.
-          colorPrimary: "#C62222",
-          colorForeground: "#17141A",
-          colorMutedForeground: "#716D78",
-          colorBorder: "#E7E5EA",
-          colorDanger: "#D82828",
-          colorSuccess: "#0E9F6E",
-          colorWarning: "#D97706",
+          // Clerk's own token names, kept in step with the palette in
+          // globals.css so its hosted forms are indistinguishable from ours.
+          colorPrimary: "#c62222",
+          colorForeground: "#17141a",
+          colorMutedForeground: "#716d78",
+          colorBorder: "#e7e5ea",
+          colorDanger: "#b42318",
+          colorSuccess: "#0e9f6e",
+          colorWarning: "#d97706",
           borderRadius: "0.625rem",
-          fontFamily: "var(--font-inter)",
+          fontFamily: "var(--font-manrope)",
         },
         elements: {
           formButtonPrimary:
@@ -125,7 +131,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${playfair.variable}`}
+      className={`${manrope.variable} ${instrumentSerif.variable}`}
     >
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider

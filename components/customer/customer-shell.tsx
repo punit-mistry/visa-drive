@@ -24,13 +24,18 @@ const NAV_ITEMS = [
   { href: "/dashboard/profile", label: "Profile", icon: User },
 ];
 
+/**
+ * Portal shell.
+ *
+ * Desktop gets a quiet left rail; phones get a scrollable tab strip pinned
+ * under the header instead, because a stacked five-item list pushed the
+ * actual page content below the fold on every single route.
+ */
 export function CustomerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
-    if (href === "/dashboard") {
-      return pathname === href;
-    }
+    if (href === "/dashboard") return pathname === href;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -55,34 +60,35 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
       </Show>
 
       <Show when="signed-in">
-        <div className="border-b border-border bg-background">
-          <div className="container-page flex flex-wrap items-center justify-between gap-3 py-4">
-            <div className="flex items-center gap-6">
-              <Logo size="md" href="/" />
-              <div className="hidden sm:block">
-                <p className="text-sm font-medium text-foreground">My Portal</p>
-                <p className="text-xs text-muted-foreground">
-                  Track applications, upload documents, and manage payments
-                </p>
+        <div className="min-h-screen bg-surface">
+          <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
+            <div className="container-page flex h-16 items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Logo size="md" href="/" />
+                <span className="hidden rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:inline">
+                  My portal
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button asChild size="sm">
+                  <Link href="/apply">
+                    <PlusCircle className="size-4" aria-hidden />
+                    <span className="hidden sm:inline">New application</span>
+                    <span className="sm:hidden">Apply</span>
+                  </Link>
+                </Button>
+                <UserButton
+                  appearance={{ elements: { avatarBox: "size-8" } }}
+                  userProfileUrl="/dashboard/profile"
+                />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button asChild size="sm">
-                <Link href="/apply">
-                  <PlusCircle className="size-4" aria-hidden />
-                  New application
-                </Link>
-              </Button>
-              <UserButton
-                appearance={{ elements: { avatarBox: "size-8" } }}
-                userProfileUrl="/dashboard/profile"
-              />
-            </div>
-          </div>
-        </div>
-        <div className="container-page grid gap-6 py-6 lg:grid-cols-[240px_1fr]">
-          <aside className="space-y-1">
-            <nav aria-label="Customer portal">
+
+            {/* Phone navigation: one horizontal strip, never a stacked list. */}
+            <nav
+              aria-label="Customer portal"
+              className="scrollbar-thin container-page flex gap-1 overflow-x-auto pb-2 lg:hidden"
+            >
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
@@ -92,9 +98,9 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors focus-brand",
+                      "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-brand",
                       active
-                        ? "bg-surface text-foreground"
+                        ? "bg-brand-tint text-brand-deep"
                         : "text-muted-foreground hover:bg-surface hover:text-foreground",
                     )}
                   >
@@ -104,8 +110,47 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
                 );
               })}
             </nav>
-          </aside>
-          <main className="min-w-0">{children}</main>
+          </header>
+
+          <div className="container-page grid gap-8 py-6 lg:grid-cols-[216px_minmax(0,1fr)] lg:py-8">
+            <aside className="hidden lg:block">
+              <nav
+                aria-label="Customer portal"
+                className="sticky top-24 flex flex-col gap-0.5"
+              >
+                {NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-brand",
+                        active
+                          ? "bg-brand-tint text-brand-deep"
+                          : "text-muted-foreground hover:bg-background hover:text-foreground",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "size-4 transition-colors",
+                          active
+                            ? "text-brand"
+                            : "text-muted-foreground group-hover:text-foreground",
+                        )}
+                        aria-hidden
+                      />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </aside>
+
+            <main className="min-w-0">{children}</main>
+          </div>
         </div>
       </Show>
     </>

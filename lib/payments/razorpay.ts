@@ -156,7 +156,7 @@ export async function openRazorpayCheckout(
         contact: input.prefill?.contact ?? undefined,
       },
       notes: input.notes,
-      theme: { color: input.themeColor ?? "#D82828" },
+      theme: { color: input.themeColor ?? "#c62222" },
       modal: {
         confirm_close: true,
         ondismiss: () => settle({ status: "dismissed" }),

@@ -7,12 +7,15 @@ import { useAction, useQuery } from "convex/react";
 import {
   AlertTriangle,
   ArrowLeft,
+  BadgeCheck,
   CheckCircle2,
   CreditCard,
   Loader2,
   Lock,
   MessageCircle,
+  ServerCog,
   ShieldCheck,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,6 +31,16 @@ import { openRazorpayCheckout } from "@/lib/payments/razorpay";
 import { formatMoney } from "@/lib/helpers/pricing";
 import { formatDate } from "@/lib/helpers/format";
 
+/**
+ * Checkout.
+ *
+ * The amount is the first thing on the page and the last thing before the
+ * button, because that is the only number the customer is being asked to
+ * agree to. Every figure here comes from the frozen pricing snapshot on the
+ * application; the server recomputes it again when it creates the order, so
+ * nothing on this screen can change what is actually charged.
+ */
+
 function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
@@ -39,6 +52,24 @@ function errorCode(error: unknown): string | null {
   const code = (data as { code?: unknown }).code;
   return typeof code === "string" ? code : null;
 }
+
+const ASSURANCES = [
+  {
+    icon: ServerCog,
+    title: "Verified on our server",
+    body: "The amount and the signature are checked server-side before your application is marked paid.",
+  },
+  {
+    icon: Lock,
+    title: "We never see your card",
+    body: "Card, UPI and bank details are handled entirely by Razorpay. Nothing is stored by VisaDrive.",
+  },
+  {
+    icon: BadgeCheck,
+    title: "A receipt, straight away",
+    body: "Your receipt appears under Payments the moment the payment clears.",
+  },
+];
 
 export default function CheckoutPage() {
   const applicationId = param(useParams().applicationId) as Id<"applications">;
@@ -75,15 +106,18 @@ export default function CheckoutPage() {
           title="Payment"
           breadcrumbs={[
             { label: "Applications", href: "/dashboard/applications" },
-            { label: application.referenceId, href: `/dashboard/applications/${applicationId}` },
+            {
+              label: application.referenceId,
+              href: `/dashboard/applications/${applicationId}`,
+            },
             { label: "Checkout" },
           ]}
         />
         <ErrorState
           title="Finish your application first"
-          description="Payment becomes available once the application has been submitted. You can pick up your saved draft at any time."
+          description="Payment becomes available once the application has been submitted. Your draft is saved and waiting."
         />
-        <Button asChild variant="outline">
+        <Button asChild>
           <Link href={`/apply/${applicationId}`}>
             <ArrowLeft className="size-4" aria-hidden />
             Continue application
@@ -157,14 +191,19 @@ export default function CheckoutPage() {
     }
   }
 
+  const total = formatMoney(application.pricing.total, application.pricing.currency);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 lg:pb-0">
       <PageHeader
         title="Complete your payment"
         description={`${application.referenceId} · ${application.visaProductName} · ${application.destinationName}`}
         breadcrumbs={[
           { label: "Applications", href: "/dashboard/applications" },
-          { label: application.referenceId, href: `/dashboard/applications/${applicationId}` },
+          {
+            label: application.referenceId,
+            href: `/dashboard/applications/${applicationId}`,
+          },
           { label: "Checkout" },
         ]}
         actions={
@@ -178,20 +217,21 @@ export default function CheckoutPage() {
       />
 
       {alreadyPaid ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-            <div className="flex size-12 items-center justify-center rounded-full bg-success-soft text-success">
-              <CheckCircle2 className="size-6" aria-hidden />
+        <Card className="animate-fade-up">
+          <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
+            <div className="animate-success-pop flex size-14 items-center justify-center rounded-full bg-success-soft text-success">
+              <CheckCircle2 className="size-7" aria-hidden />
             </div>
-            <div>
+            <div className="space-y-2">
               <p className="text-lg font-semibold">
                 {application.paymentStatus === "not_required"
                   ? "No payment is required"
                   : "This application is already paid"}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Payment status: <PaymentStatusBadge status={application.paymentStatus} size="sm" />
-              </p>
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <span>Payment status</span>
+                <PaymentStatusBadge status={application.paymentStatus} size="sm" />
+              </div>
             </div>
             <Button asChild>
               <Link href={`/dashboard/applications/${applicationId}`}>
@@ -201,36 +241,56 @@ export default function CheckoutPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          {/* ------------------------------ pay side ------------------------- */}
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment method</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4">
+            <Card className="animate-fade-up gap-0 overflow-hidden py-0">
+              <div className="border-b border-border bg-surface px-6 py-5">
+                <p className="text-eyebrow">Amount due</p>
+                <p className="mt-1.5 text-4xl font-semibold tracking-tight tabular-nums">
+                  {total}
+                </p>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  For {application.travellerCount}{" "}
+                  {application.travellerCount === 1 ? "traveller" : "travellers"} ·{" "}
+                  {application.visaProductName}
+                </p>
+              </div>
+
+              <div className="space-y-5 p-6">
+                <div className="flex items-start gap-3.5 rounded-xl border border-primary/25 bg-brand-tint p-4">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background elev-sm">
                     <CreditCard className="size-5 text-brand" aria-hidden />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium">Pay securely with Razorpay</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Cards, UPI, net banking and wallets. The amount is verified on our
-                      server before checkout opens.
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Smartphone className="size-3" aria-hidden />
+                        UPI
+                      </span>
+                      <span aria-hidden>·</span>
+                      <span>Cards</span>
+                      <span aria-hidden>·</span>
+                      <span>Net banking</span>
+                      <span aria-hidden>·</span>
+                      <span>Wallets</span>
                     </p>
                   </div>
                 </div>
 
                 {notConfigured && (
-                  <div className="flex items-start gap-3 rounded-xl border border-warning/25 bg-warning-soft p-4 text-sm text-warning">
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft p-4 text-sm">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
                     <div>
-                      <p className="font-medium">Online payment is not configured yet</p>
-                      <p className="mt-1">
+                      <p className="font-medium text-foreground">
+                        Online payment is not configured yet
+                      </p>
+                      <p className="mt-1 text-muted-foreground">
                         Your application is saved and the VisaDrive team will send you
                         payment instructions. No money has been taken.
                       </p>
-                      <Button asChild variant="outline" size="sm" className="mt-3">
+                      <Button asChild variant="outline" size="sm" className="mt-3 bg-background">
                         <a
                           href={`https://wa.me/?text=${encodeURIComponent(
                             `Hi VisaDrive, I would like to pay for application ${application.referenceId}.`,
@@ -247,7 +307,7 @@ export default function CheckoutPage() {
                 )}
 
                 <Button
-                  className="w-full"
+                  className="hidden w-full lg:inline-flex"
                   size="lg"
                   onClick={handlePay}
                   disabled={paying}
@@ -257,26 +317,46 @@ export default function CheckoutPage() {
                   ) : (
                     <Lock className="size-4" aria-hidden />
                   )}
-                  Pay {formatMoney(application.pricing.total, application.pricing.currency)}
+                  {paying ? "Opening secure checkout…" : `Pay ${total}`}
                 </Button>
 
-                <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                <p className="hidden items-center justify-center gap-1.5 text-xs text-muted-foreground lg:flex">
                   <ShieldCheck className="size-3.5" aria-hidden />
                   Verified server-side. We never store your card details.
                 </p>
+              </div>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Why this is safe</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-5 sm:grid-cols-3">
+                {ASSURANCES.map((item) => (
+                  <div key={item.title}>
+                    <item.icon className="size-4 text-brand" aria-hidden />
+                    <p className="mt-2.5 text-sm font-medium">{item.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      {item.body}
+                    </p>
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Application</CardTitle>
+                <CardTitle className="text-base">What you are paying for</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
-                <Field label="Reference" value={application.referenceId} />
-                <Field label="Travellers" value={String(application.travellerCount)} />
-                <Field label="Destination" value={application.destinationName} />
-                <Field label="Visa service" value={application.visaProductName} />
-                <Field
+                <DetailField label="Reference" value={application.referenceId} />
+                <DetailField
+                  label="Travellers"
+                  value={String(application.travellerCount)}
+                />
+                <DetailField label="Destination" value={application.destinationName} />
+                <DetailField label="Visa service" value={application.visaProductName} />
+                <DetailField
                   label="Travel dates"
                   value={
                     application.intendedArrivalDate || application.intendedDepartureDate
@@ -286,15 +366,19 @@ export default function CheckoutPage() {
                       : "Not provided"
                   }
                 />
-                <Field label="Submitted" value={formatDate(application.submittedAt)} />
+                <DetailField
+                  label="Submitted"
+                  value={formatDate(application.submittedAt)}
+                />
               </CardContent>
             </Card>
           </div>
 
+          {/* ---------------------------- summary rail ----------------------- */}
           <div>
-            <Card>
+            <Card className="lg:sticky lg:top-24">
               <CardHeader>
-                <CardTitle>Order summary</CardTitle>
+                <CardTitle className="text-base">Order summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <Row
@@ -337,25 +421,42 @@ export default function CheckoutPage() {
                   )}
                 />
                 <Separator />
-                <Row
-                  label="Total due"
-                  value={formatMoney(
-                    application.pricing.total,
-                    application.pricing.currency,
-                  )}
-                  strong
-                />
+                <div className="flex items-baseline justify-between">
+                  <span className="font-medium">Total due</span>
+                  <span className="text-xl font-semibold tabular-nums tracking-tight">
+                    {total}
+                  </span>
+                </div>
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-muted-foreground">Payment status</span>
                   <PaymentStatusBadge status={application.paymentStatus} />
                 </div>
-                <p className="pt-2 text-xs text-muted-foreground">
-                  The amount is recomputed from the catalogue on the server when the
+                <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+                  The amount is recomputed from the catalogue on our server when the
                   order is created. The total shown here is the amount that will be
                   charged.
                 </p>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Phones: the action follows the customer down the page instead of
+              sitting above a scroll they have to come back from. */}
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-4 backdrop-blur-sm lg:hidden">
+            <div className="container-page flex items-center gap-3 px-0">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground">Total due</p>
+                <p className="truncate text-base font-semibold tabular-nums">{total}</p>
+              </div>
+              <Button size="lg" onClick={handlePay} disabled={paying} className="shrink-0">
+                {paying ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Lock className="size-4" aria-hidden />
+                )}
+                {paying ? "Opening…" : "Pay now"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -363,33 +464,19 @@ export default function CheckoutPage() {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function DetailField({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-eyebrow">{label}</p>
       <p className="mt-1 text-sm">{value}</p>
     </div>
   );
 }
 
-function Row({
-  label,
-  value,
-  strong = false,
-}: {
-  label: string;
-  value: React.ReactNode;
-  strong?: boolean;
-}) {
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div
-      className={
-        strong
-          ? "flex items-center justify-between font-semibold"
-          : "flex items-center justify-between"
-      }
-    >
-      <span className={strong ? "" : "text-muted-foreground"}>{label}</span>
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
       <span className="tabular-nums">{value}</span>
     </div>
   );

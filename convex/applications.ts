@@ -322,29 +322,40 @@ export const getDraft = query({
       authError("FORBIDDEN", "You do not have access to this application.");
     }
 
-    const [applicants, documents, product, requirements] = await Promise.all([
-      ctx.db
-        .query("applicants")
-        .withIndex("by_application_order", (q) =>
-          q.eq("applicationId", args.applicationId),
-        )
-        .collect(),
-      ctx.db
-        .query("documents")
-        .withIndex("by_application_current", (q) =>
-          q.eq("applicationId", args.applicationId).eq("isCurrent", true),
-        )
-        .collect(),
-      ctx.db.get(application.visaProductId),
-      ctx.db
-        .query("visaRequirements")
-        .withIndex("by_product_order", (q) =>
-          q.eq("visaProductId", application.visaProductId),
-        )
-        .collect(),
-    ]);
+    const [applicants, documents, product, requirements, destination] =
+      await Promise.all([
+        ctx.db
+          .query("applicants")
+          .withIndex("by_application_order", (q) =>
+            q.eq("applicationId", args.applicationId),
+          )
+          .collect(),
+        ctx.db
+          .query("documents")
+          .withIndex("by_application_current", (q) =>
+            q.eq("applicationId", args.applicationId).eq("isCurrent", true),
+          )
+          .collect(),
+        ctx.db.get(application.visaProductId),
+        ctx.db
+          .query("visaRequirements")
+          .withIndex("by_product_order", (q) =>
+            q.eq("visaProductId", application.visaProductId),
+          )
+          .collect(),
+        // The wizard summary rail shows the destination flag beside the
+        // product name; the application row only denormalises the name.
+        ctx.db.get(application.destinationId),
+      ]);
 
-    return { application, applicants, documents, product, requirements };
+    return {
+      application,
+      applicants,
+      documents,
+      product,
+      requirements,
+      destination,
+    };
   },
 });
 

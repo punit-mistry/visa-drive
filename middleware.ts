@@ -28,7 +28,12 @@ export default clerkMiddleware(async (auth, req) => {
   if (isPublicApiRoute(req)) return NextResponse.next();
 
   if (isCustomerRoute(req)) {
-    await auth.protect();
+    // Without an explicit URL, protect() answers a signed-out visitor with a
+    // bare 404 — a dead end for anyone who clicked "Start application" while
+    // logged out. Send them to sign-in and back to where they were going.
+    const signIn = new URL("/sign-in", req.url);
+    signIn.searchParams.set("redirect_url", req.nextUrl.pathname);
+    await auth.protect({ unauthenticatedUrl: signIn.toString() });
     return NextResponse.next();
   }
 

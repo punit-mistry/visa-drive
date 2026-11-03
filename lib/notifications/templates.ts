@@ -26,11 +26,11 @@ import { formatMoney } from "../helpers/pricing";
 /*                                   Theme                                    */
 /* -------------------------------------------------------------------------- */
 
-const BRAND = "#C62222";
-const BRAND_DEEP = "#9E1A1A";
-const INK = "#1A1A1A";
-const MUTED = "#5F6368";
-const HAIRLINE = "#E6E6E8";
+const BRAND = "#c62222";
+const BRAND_DEEP = "#a81a1a";
+const INK = "#17141a";
+const MUTED = "#716d78";
+const HAIRLINE = "#e7e5ea";
 const CANVAS = "#F4F4F5";
 const PANEL = "#FAFAFA";
 
