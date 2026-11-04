@@ -5,6 +5,7 @@ import { CalendarIcon } from "lucide-react";
 import type { Matcher } from "react-day-picker";
 
 import { Calendar } from "@/components/ui/calendar";
+import { useCurrentYear } from "@/hooks/use-current-date";
 import {
   Popover,
   PopoverContent,
@@ -20,6 +21,11 @@ import { cn } from "@/lib/utils";
  * This control reads and writes that same string, which means it can replace
  * a native `<input type="date">` without touching any save path.
  */
+
+/** Only ever used for the dropdown range during prerender, before the real
+ *  year arrives on hydration. The range is ±decades wide, so being a year out
+ *  for one frame changes nothing a user can see. */
+const FALLBACK_YEAR = 2026;
 
 function parseISODay(value?: string): Date | undefined {
   if (!value) return undefined;
@@ -73,7 +79,12 @@ export function DateField({
 }) {
   const [open, setOpen] = React.useState(false);
   const selected = parseISODay(value);
-  const thisYear = new Date().getFullYear();
+  // Not `new Date()`: this control now also renders on prerendered marketing
+  // pages, and reading the clock during render bakes the build date into the
+  // HTML — which Next rejects outright as an unstable value. The hook keeps
+  // the server snapshot empty and reads the clock after hydration.
+  const liveYear = useCurrentYear();
+  const thisYear = liveYear ?? FALLBACK_YEAR;
 
   const startMonth = new Date(fromYear ?? thisYear - 90, 0, 1);
   const endMonth = new Date(toYear ?? thisYear + 10, 11, 31);

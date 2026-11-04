@@ -17,7 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/shared/date-field";
 import {
   Select,
   SelectContent,
@@ -33,6 +33,27 @@ import {
   type VisaDiscoveryValues,
 } from "@/lib/validators/forms";
 import { cn } from "@/lib/utils";
+
+/**
+ * The form keeps the travel date as epoch milliseconds (the shape the search
+ * params and the rest of the product use); `DateField` speaks the ISO day
+ * string. These two convert between them, and a value that is not a real day
+ * becomes `undefined` rather than `NaN` — a half-formed date must never reach
+ * the query string.
+ */
+function toISODay(ms?: number): string {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return "";
+  const date = new Date(ms);
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function fromISODay(value: string): number | undefined {
+  if (!value) return undefined;
+  const parsed = Date.parse(`${value}T00:00:00`);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 /**
  * The homepage's primary conversion path.
@@ -81,9 +102,11 @@ export function VisaDiscoveryForm({
     router.push(`/destinations?${params.toString()}`);
   }
 
-  // Today in ISO form, for the date input's `min` — nobody applies for a visa
-  // for a trip that has already happened.
+  // Today, resolved on the client so the server and the browser cannot
+  // disagree about the date. Nobody applies for a visa for a trip that has
+  // already happened, so it is the calendar's floor.
   const today = useTodayIso();
+  const minDate = today ? new Date(`${today}T00:00:00`) : undefined;
 
   return (
     <Form {...form}>
@@ -179,24 +202,12 @@ export function VisaDiscoveryForm({
               <FormItem className="gap-0 bg-card px-4 py-3">
                 <FormLabel className="text-eyebrow">Travel date</FormLabel>
                 <FormControl>
-                  <Input
-                    type="date"
-                    min={today || undefined}
-                    value={
-                      field.value
-                        ? new Date(field.value).toISOString().slice(0, 10)
-                        : ""
-                    }
-                    onChange={(event) => {
-                      const raw = event.target.value;
-                      if (!raw) {
-                        field.onChange(undefined);
-                        return;
-                      }
-                      const parsed = Date.parse(`${raw}T00:00:00`);
-                      field.onChange(Number.isNaN(parsed) ? undefined : parsed);
-                    }}
-                    className="h-auto rounded-none border-0 bg-transparent px-0 py-1 text-base font-medium shadow-none focus-visible:ring-0 dark:bg-transparent"
+                  <DateField
+                    value={toISODay(field.value)}
+                    onChange={(iso) => field.onChange(fromISODay(iso))}
+                    placeholder="Any date"
+                    minDate={minDate}
+                    className="h-auto rounded-none border-0 bg-transparent px-0 py-1 text-base font-medium shadow-none hover:border-0 focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
                   />
                 </FormControl>
                 <FormMessage className="mt-1 text-xs" />

@@ -11,7 +11,6 @@ import {
   CreditCard,
   FileText,
   LayoutDashboard,
-  Loader2,
   Menu,
   MessageSquare,
   Settings,
@@ -21,6 +20,8 @@ import {
 } from "lucide-react";
 
 import { Logo } from "@/components/shared/logo";
+import { HelpAssistant } from "@/components/shared/help-assistant";
+import { VisaLoader } from "@/components/shared/visa-loader";
 import { AccountBlockedState, AccountSetupState } from "@/components/shared/account-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,10 +91,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
-        <p className="text-sm text-muted-foreground">Checking your access…</p>
-      </div>
+      <VisaLoader
+        fullscreen
+        label="Checking your access"
+        hint="Matching your account to its role and permissions."
+      />
     );
   }
 
@@ -201,7 +203,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     Admin
                   </span>
                 </div>
-                <nav className="scrollbar-thin max-h-[calc(100vh-4rem)] space-y-6 overflow-y-auto p-4">
+                <nav data-tour="admin-nav" className="scrollbar-thin max-h-[calc(100vh-4rem)] space-y-6 overflow-y-auto p-4">
                   <AdminNav groups={navGroupsWithItems} pathname={pathname} dark />
                 </nav>
                 <div className="border-t border-sidebar-border p-4">
@@ -243,6 +245,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 <main className="min-w-0 flex-1 p-4 lg:p-6">{children}</main>
               </div>
             </div>
+
+            <HelpAssistant surface="staff" />
           </div>
         )}
       </Show>
@@ -284,6 +288,7 @@ function AdminNav({
                 <Link
                   key={item.href}
                   href={item.href}
+                  data-tour={`admin-nav-${item.href.split("/").pop()}`}
                   aria-current={active ? "page" : undefined}
                   onClick={onNavigate}
                   className={cn(

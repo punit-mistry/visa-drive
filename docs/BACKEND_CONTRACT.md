@@ -37,13 +37,18 @@ same change.
 | `listCustomers` | query | Paginated, filter `{ search?, status?, sort? }`. Requires `customer:view`. |
 | `customerProfile` | query | One customer + applications, payments, conversations summary. |
 | `updateProfile` | mutation | Caller edits their own name/phone/opt-ins. |
+| `markTourSeen` | mutation | Self-only. Records a dismissed guided tour on `users.dismissedTours`; capped at 20 ids. Unaudited — a UI preference, not a consequential change. |
+| `resetTour` | mutation | Self-only. Removes one tour id so the walkthrough can be replayed. |
+| `updateCustomer` | mutation | Requires `customer:edit`. Name, phone and opt-ins only; re-snapshots the name/phone onto the customer's recent applications. Refuses staff targets. |
 | `setRole` | mutation | Requires `staff:assign_role`; blocks escalation above the actor. |
 | `suspendCustomer` / `reactivateCustomer` | mutation | Requires `customer:suspend`. Audited. |
-| `upsertFromClerk` | internalMutation | Called by the Clerk webhook. |
+| `upsertFromClerk` | internalMutation | Called by the Clerk webhook. Returns the user id, or `null` when the address already belongs to another row and this identity has not verified it. |
+| `syncFromClerk` | mutation | Self-heal when the webhook lags. Builds the row from the verified JWT only; `{ status: "ready" \| "incomplete" \| "deleted" }`. |
 | `deleteFromClerk` | internalMutation | Soft-delete on Clerk user deletion. |
 | `listStaff` | query | Requires `staff:view`. |
-| `inviteStaff` | mutation | Requires `staff:manage`. Creates or promotes a user + staffProfile. |
-| `updateStaffProfile` | mutation | Requires `staff:manage`. |
+| `inviteStaff` | mutation | Requires `staff:manage`. Creates or promotes a user + staffProfile. Re-inviting an existing account is a role change, so it carries the same rank and last-super-admin guards as `setRole`. |
+| `updateStaffProfile` | mutation | Requires `staff:manage`. Only a super admin may edit a super admin's profile; `extraPermissions` must be known permissions the actor already holds; cannot deactivate the last super admin. |
+| `linkClerkAccount` | mutation | Requires `staff:manage`. Attaches a provisioned sign-in to an invited row; only ever rewrites a `pending:` placeholder, onto a Clerk id nobody else holds. |
 | `deactivateStaff` | mutation | Requires `staff:manage`. |
 
 ## `convex/destinations.ts`
@@ -98,6 +103,7 @@ same change.
 | `getForAdmin` | query | Full workspace payload. |
 | `updateStatus` | mutation | Validates against `ALLOWED_TRANSITIONS`. Audited + notifies. |
 | `bulkUpdateStatus` | mutation | Requires `application:bulk_update`. |
+| `updateTripDetails` | mutation | Requires `application:update_status`. Staff correcting travel dates, purpose, departure country and contact phone after submission. Cannot reach status, pricing or travellerCount. Audited. |
 | `assignAgent` | mutation | Requires `application:assign`. |
 | `uploadFinalDocument` | mutation | Requires `application:upload_final_document`. |
 | `markCompleted` | mutation | Requires `application:update_status`. |
@@ -146,7 +152,9 @@ verified through the parent application.
 
 ## `convex/enquiries.ts`
 
-`submit` (**public mutation, no auth** — rate-limited, returns a reference),
+`submit` (**public mutation, no auth** — rate-limited, returns a reference;
+`source` accepts `help_assistant` for questions handed over from the in-app
+help panel),
 `listForAdmin`, `getForAdmin`, `updateLeadStatus`, `assign`,
 `setFollowUp`, `recordContactAttempt`, `convertToApplication`, `exportCsv`.
 

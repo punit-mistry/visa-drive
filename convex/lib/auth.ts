@@ -26,6 +26,16 @@ import {
 
 export type AnyCtx = QueryCtx | MutationCtx;
 
+/**
+ * `users.inviteStaff` parks an invited colleague on a `pending:<email>`
+ * clerkId until they actually sign in. That sentinel is a placeholder, never a
+ * Clerk subject, so a token presenting one is not a session — it is somebody
+ * guessing. Both lookups below refuse to resolve it.
+ */
+function isPendingPlaceholder(clerkId: string): boolean {
+  return clerkId.startsWith("pending:");
+}
+
 export type AuthErrorCode =
   | "UNAUTHENTICATED"
   | "NO_PROFILE"
@@ -43,6 +53,7 @@ export function authError(code: AuthErrorCode, message: string): never {
 export async function getAuthUser(ctx: AnyCtx): Promise<Doc<"users"> | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
+  if (isPendingPlaceholder(identity.subject)) return null;
 
   const user = await ctx.db
     .query("users")
@@ -56,6 +67,9 @@ export async function getAuthUser(ctx: AnyCtx): Promise<Doc<"users"> | null> {
 export async function requireUser(ctx: AnyCtx): Promise<Doc<"users">> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
+    authError("UNAUTHENTICATED", "You must be signed in to do this.");
+  }
+  if (isPendingPlaceholder(identity.subject)) {
     authError("UNAUTHENTICATED", "You must be signed in to do this.");
   }
 
@@ -192,8 +206,25 @@ export async function callerHasPermission(
 export interface ApplicationAccess {
   user: Doc<"users">;
   application: Doc<"applications">;
-  /** True when access was granted by staff permission rather than ownership. */
+  /** True when the caller is the customer this application belongs to. */
+  isOwner: boolean;
+  /**
+   * True when the caller reaches this application through a staff grant.
+   *
+   * Independent of `isOwner`: a colleague who booked a visa through their own
+   * portal account is both. The CRM screens key off this flag, so collapsing
+   * the two would lock a staff member out of any application they happen to
+   * own — which is exactly what used to happen.
+   */
   viaStaff: boolean;
+  /**
+   * True when the caller is exercising staff powers over somebody else's
+   * booking. This is the flag behavioural switches want — who the author of a
+   * message is, whether the customer upload window applies, whether the
+   * assigned agent gets a "customer uploaded" nudge. `viaStaff` on its own
+   * answers a different question: may this caller see the CRM view.
+   */
+  actingAsStaff: boolean;
   staff: StaffContext | null;
 }
 
@@ -202,6 +233,8 @@ export interface ApplicationAccess {
  *
  * A customer may only reach their own. Staff need `application:view_all`, or
  * `application:view_assigned` with the application actually assigned to them.
+ * Owning the row and holding a staff grant are evaluated separately, because a
+ * member of the team is allowed to be a customer too.
  */
 export async function requireApplicationAccess(
   ctx: AnyCtx,
@@ -215,35 +248,64 @@ export async function requireApplicationAccess(
     authError("NOT_FOUND", "Application not found.");
   }
 
-  // Owner path
-  if (application.userId === user._id) {
-    return { user, application, viaStaff: false, staff: null };
-  }
+  const isOwner = application.userId === user._id;
 
-  // Staff path
+  /* ----------------------------- customers ------------------------------ */
   if (!isStaffRole(user.role)) {
-    authError("FORBIDDEN", "You do not have access to this application.");
+    if (!isOwner) {
+      authError("FORBIDDEN", "You do not have access to this application.");
+    }
+    if (opts.write) {
+      authError(
+        "FORBIDDEN",
+        "You do not have permission to modify this application.",
+      );
+    }
+    return {
+      user,
+      application,
+      isOwner,
+      viaStaff: false,
+      actingAsStaff: false,
+      staff: null,
+    };
   }
 
+  /* ------------------------------- staff -------------------------------- */
   const staff = await getStaffContext(ctx, user);
-  if (staff.profile && !staff.profile.isActive) {
-    authError("FORBIDDEN", "Your staff account has been deactivated.");
-  }
+  const profileActive = !staff.profile || staff.profile.isActive;
 
-  const canViewAll = staff.permissions.has("application:view_all");
+  const canViewAll = profileActive && staff.permissions.has("application:view_all");
   const canViewAssigned =
+    profileActive &&
     staff.permissions.has("application:view_assigned") &&
     application.assignedAgentId === user._id;
 
-  if (!canViewAll && !canViewAssigned) {
-    authError("FORBIDDEN", "You do not have access to this application.");
+  const viaStaff = canViewAll || canViewAssigned;
+
+  if (!viaStaff && !isOwner) {
+    authError(
+      "FORBIDDEN",
+      profileActive
+        ? "You do not have access to this application."
+        : "Your staff account has been deactivated.",
+    );
   }
 
-  if (opts.write && !staff.permissions.has("application:update_status")) {
+  // `write` means "acting as staff", so it always needs the grant — owning the
+  // row is not a way around the permission.
+  if (opts.write && (!viaStaff || !staff.permissions.has("application:update_status"))) {
     authError("FORBIDDEN", "You do not have permission to modify this application.");
   }
 
-  return { user, application, viaStaff: true, staff };
+  return {
+    user,
+    application,
+    isOwner,
+    viaStaff,
+    actingAsStaff: viaStaff && !isOwner,
+    staff: viaStaff ? staff : null,
+  };
 }
 
 /**

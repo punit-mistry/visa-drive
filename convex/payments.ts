@@ -260,8 +260,10 @@ export const prepareOrderInternal = internalMutation({
     const application = access.application;
 
     // Paying is something the customer does for their own booking. Staff
-    // collecting money use `recordManualPayment`, which is audited.
-    if (access.viaStaff) {
+    // collecting money use `recordManualPayment`, which is audited. Keyed on
+    // ownership, not on the staff grant: a colleague paying for their own
+    // visa is a customer at that moment.
+    if (!access.isOwner) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Staff cannot start a checkout on a customer's behalf.",

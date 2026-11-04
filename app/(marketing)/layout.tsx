@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
+import { SPLASH_GUARD, WelcomeSplash } from "@/components/marketing/welcome-splash";
 import { SmoothScroll } from "@/components/providers/smooth-scroll";
 import { WhatsAppButton } from "@/components/shared/whatsapp-button";
 
@@ -21,6 +22,10 @@ export default function MarketingLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* Blocking on purpose and tiny: it has to mark the document before the
+          first paint, or a second page flashes the splash it already saw. */}
+      <script dangerouslySetInnerHTML={{ __html: SPLASH_GUARD }} />
+      <WelcomeSplash />
       {/* Reads the current pathname for active-link state, which is runtime
           URL data, so both are suspended to let the rest of the page
           prerender while they stream in. */}

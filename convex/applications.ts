@@ -1158,6 +1158,107 @@ export const updateStatus = mutation({
   },
 });
 
+/**
+ * Staff correcting the trip details on a submitted application.
+ *
+ * The customer's own route into these fields is `saveDraftStep`, which stops
+ * at submission — after that the booking is the office's to correct, usually
+ * because the customer phoned in a date change. Deliberately the same
+ * allow-list of columns: `status`, `paymentStatus`, `pricing` and
+ * `travellerCount` are not reachable here either, because each of them has a
+ * mutation of its own that does the arithmetic or the transition check.
+ */
+export const updateTripDetails = mutation({
+  args: {
+    applicationId: v.id("applications"),
+    patch: v.object({
+      departureCountry: v.optional(v.string()),
+      travelPurpose: v.optional(v.string()),
+      intendedArrivalDate: v.optional(v.union(v.number(), v.null())),
+      intendedDepartureDate: v.optional(v.union(v.number(), v.null())),
+      previousTravelHistory: v.optional(v.string()),
+      hasPreviousVisaRejection: v.optional(v.boolean()),
+      previousVisaRejectionNote: v.optional(v.string()),
+      customerPhone: v.optional(v.string()),
+    }),
+    note: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const access = await requireApplicationAccess(ctx, args.applicationId, {
+      write: true,
+    });
+    const application = access.application;
+
+    const patch: Partial<Doc<"applications">> = { updatedAt: Date.now() };
+    const before: Record<string, unknown> = {};
+    const after: Record<string, unknown> = {};
+
+    const text = (value: string | undefined) => {
+      const trimmed = value?.trim();
+      return trimmed && trimmed.length > 0 ? trimmed : undefined;
+    };
+
+    for (const key of [
+      "departureCountry",
+      "travelPurpose",
+      "previousTravelHistory",
+      "previousVisaRejectionNote",
+      "customerPhone",
+    ] as const) {
+      const value = args.patch[key];
+      if (value === undefined) continue;
+      patch[key] = text(value);
+      before[key] = application[key];
+      after[key] = patch[key];
+    }
+
+    for (const key of ["intendedArrivalDate", "intendedDepartureDate"] as const) {
+      const value = args.patch[key];
+      if (value === undefined) continue;
+      // `null` clears the date; the schema column is optional, and `undefined`
+      // in a patch is how Convex removes it.
+      patch[key] = value === null ? undefined : value;
+      before[key] = application[key];
+      after[key] = patch[key];
+    }
+
+    if (args.patch.hasPreviousVisaRejection !== undefined) {
+      patch.hasPreviousVisaRejection = args.patch.hasPreviousVisaRejection;
+      before.hasPreviousVisaRejection = application.hasPreviousVisaRejection;
+      after.hasPreviousVisaRejection = args.patch.hasPreviousVisaRejection;
+    }
+
+    const arrival = patch.intendedArrivalDate ?? application.intendedArrivalDate;
+    const departure =
+      patch.intendedDepartureDate ?? application.intendedDepartureDate;
+    if (arrival !== undefined && departure !== undefined && departure < arrival) {
+      throw new ConvexError({
+        code: "VALIDATION",
+        message: "The return date cannot be before the arrival date.",
+      });
+    }
+
+    if (Object.keys(after).length === 0) return null;
+
+    await ctx.db.patch(application._id, patch);
+
+    await recordAudit(ctx, {
+      actor: access.user,
+      action: "application.trip_details_updated",
+      entityType: "application",
+      entityId: application._id,
+      summary: `${access.user.fullName} corrected the trip details on ${application.referenceId}${
+        args.note?.trim() ? ` — ${args.note.trim()}` : ""
+      }`,
+      before,
+      after,
+    });
+
+    return null;
+  },
+});
+
 export const bulkUpdateStatus = mutation({
   args: {
     applicationIds: v.array(v.id("applications")),

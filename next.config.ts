@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
     // which is why a bad URL in the catalogue can never render as a broken
     // image on the public site.
     remotePatterns: [
+      // Country flags, keyed by ISO-3166 alpha-2. Not admin-configured — the
+      // URL is built from the destination's own country code, so there is no
+      // path by which a catalogue edit reaches this host.
+      { protocol: "https", hostname: "flagcdn.com" },
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "plus.unsplash.com" },
       { protocol: "https", hostname: "upload.wikimedia.org" },

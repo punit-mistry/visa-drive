@@ -22,10 +22,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard, StatGrid } from "@/components/shared/stat-card";
-import { StatCardSkeleton } from "@/components/shared/states";
+import { NoAccessState, StatCardSkeleton } from "@/components/shared/states";
 import { ToneBadge } from "@/components/shared/status-badge";
 import { DataTable, CursorPagination } from "@/components/tables/data-table";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useDebounce } from "@/hooks/use-debounce";
+import { PERMISSIONS } from "@/lib/constants/roles";
 import { formatDate, titleCase } from "@/lib/helpers/format";
 import { formatMoney } from "@/lib/helpers/pricing";
 import type { StatusTone } from "@/lib/constants/statuses";
@@ -83,6 +85,12 @@ function dateEnd(value: string): number | undefined {
 }
 
 export default function AdminPaymentsPage() {
+  // Support agents have no `payment:view`. Issuing the query anyway threw a
+  // FORBIDDEN out of `useQuery` and crashed the route, so it is skipped and
+  // the page says so instead.
+  const { can } = useCurrentUser();
+  const canView = can(PERMISSIONS.PAYMENT_VIEW);
+
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PaymentRowStatus | "">("");
   const [mode, setMode] = useState<(typeof PAYMENT_MODES)[number] | "">("");
@@ -90,17 +98,19 @@ export default function AdminPaymentsPage() {
   const [dateTo, setDateTo] = useState("");
   const debouncedSearch = useDebounce(search);
 
-  const summary = useQuery(api.payments.financeSummary, {});
+  const summary = useQuery(api.payments.financeSummary, canView ? {} : "skip");
 
   const { results, status: pageStatus, loadMore } = usePaginatedQuery(
     api.payments.listForAdmin,
-    {
-      search: debouncedSearch.trim() || undefined,
-      status: status || undefined,
-      mode: mode || undefined,
-      dateFrom: dateStart(dateFrom),
-      dateTo: dateEnd(dateTo),
-    },
+    canView
+      ? {
+          search: debouncedSearch.trim() || undefined,
+          status: status || undefined,
+          mode: mode || undefined,
+          dateFrom: dateStart(dateFrom),
+          dateTo: dateEnd(dateTo),
+        }
+      : "skip",
     { initialNumItems: 25 },
   );
 
@@ -209,6 +219,18 @@ export default function AdminPaymentsPage() {
     setMode("");
     setDateFrom("");
     setDateTo("");
+  }
+
+  if (!canView) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Payments"
+          description="Every payment attempt and settlement."
+        />
+        <NoAccessState description="Payments are visible to processing agents and above. Ask an administrator if you need access." />
+      </div>
+    );
   }
 
   return (

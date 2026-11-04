@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, type LucideIcon, RefreshCw } from "lucide-react";
+import { AlertCircle, Lock, type LucideIcon, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,40 @@ export function ErrorState({
           Try again
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * "Your role does not include this."
+ *
+ * Distinct from `ErrorState` on purpose: nothing has gone wrong, and telling a
+ * support agent that the payments page is broken would have them raise a
+ * ticket for something working exactly as configured. Pages render this
+ * instead of issuing a query they know will be refused — a refused query
+ * throws out of `useQuery` and takes the whole route down with it.
+ */
+export function NoAccessState({
+  title = "You do not have access to this",
+  description = "Your role does not include this area. Ask an administrator if you think it should.",
+  className,
+}: {
+  title?: string;
+  description?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center rounded-xl border border-border bg-surface px-6 py-12 text-center",
+        className,
+      )}
+    >
+      <div className="mb-4 flex size-11 items-center justify-center rounded-xl bg-background elev-sm">
+        <Lock className="size-5 text-muted-foreground" aria-hidden />
+      </div>
+      <p className="text-base font-medium text-foreground">{title}</p>
+      <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">{description}</p>
     </div>
   );
 }

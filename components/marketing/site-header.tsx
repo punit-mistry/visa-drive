@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Show, UserButton } from "@clerk/nextjs";
-import { Menu, Phone } from "lucide-react";
+import { Menu, Phone, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { Logo } from "@/components/shared/logo";
@@ -18,6 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { MARKETING_NAV } from "@/lib/constants/site";
@@ -37,6 +38,9 @@ import { cn } from "@/lib/utils";
 export function SiteHeader() {
   const pathname = usePathname();
   const settings = useSiteSettings();
+  // Staff browsing the public site should be one click from the CRM rather
+  // than having to type /admin. Customers never see this.
+  const { isStaff } = useCurrentUser();
   const [scrolled, setScrolled] = useState(false);
   const [drawer, setDrawer] = useState<{ pathname: string; open: boolean } | null>(
     null,
@@ -216,6 +220,23 @@ export function SiteHeader() {
           </Show>
 
           <Show when="signed-in">
+            {isStaff && (
+              <Button
+                asChild
+                size="sm"
+                variant="ghost"
+                className={cn(
+                  "hidden sm:inline-flex",
+                  hasCinematicHero &&
+                    "text-white/80 hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
+                )}
+              >
+                <Link href="/admin">
+                  <ShieldCheck className="size-4" aria-hidden />
+                  Admin
+                </Link>
+              </Button>
+            )}
             <Button
               asChild
               size="sm"
@@ -307,6 +328,16 @@ export function SiteHeader() {
                       <Link href="/dashboard">My dashboard</Link>
                     </Button>
                   </SheetClose>
+                  {isStaff && (
+                    <SheetClose asChild>
+                      <Button asChild variant="outline" className="w-full">
+                        <Link href="/admin">
+                          <ShieldCheck className="size-4" aria-hidden />
+                          Admin CRM
+                        </Link>
+                      </Button>
+                    </SheetClose>
+                  )}
                 </Show>
 
                 <a

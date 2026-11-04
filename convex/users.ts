@@ -402,6 +402,154 @@ export const updateProfile = mutation({
   },
 });
 
+/** Ids are front-end constants, so the column is capped rather than enumerated. */
+const TOUR_ID_LIMIT = 40;
+const MAX_DISMISSED_TOURS = 20;
+
+/**
+ * "I have seen this walkthrough."
+ *
+ * Self-only, unaudited and deliberately trivial: it records a UI preference,
+ * not a consequential change. It lives on the user row instead of in
+ * `localStorage` so the tour does not reintroduce itself on the next device —
+ * an operations team that uses three machines would otherwise meet it daily.
+ */
+export const markTourSeen = mutation({
+  args: { tourId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const tourId = args.tourId.trim().slice(0, TOUR_ID_LIMIT);
+    if (!tourId) return null;
+
+    const seen = user.dismissedTours ?? [];
+    if (seen.includes(tourId)) return null;
+
+    await ctx.db.patch(user._id, {
+      // Newest last, oldest evicted: an unbounded array on a hot row is how a
+      // harmless preference turns into a document-size failure.
+      dismissedTours: [...seen, tourId].slice(-MAX_DISMISSED_TOURS),
+    });
+    return null;
+  },
+});
+
+/** Lets someone replay a walkthrough they dismissed. */
+export const resetTour = mutation({
+  args: { tourId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const seen = user.dismissedTours ?? [];
+    const next = seen.filter((id) => id !== args.tourId);
+    if (next.length !== seen.length) {
+      await ctx.db.patch(user._id, { dismissedTours: next });
+    }
+    return null;
+  },
+});
+
+/**
+ * Staff correcting a customer's contact details.
+ *
+ * Narrow on purpose. Name, phone and the two opt-ins are things the office
+ * fixes over the phone every week; `email`, `role` and `status` are not here
+ * because the first belongs to Clerk (it is the identity this row is keyed to)
+ * and the other two have their own audited mutations.
+ *
+ * The name is snapshotted onto the customer's applications so the CRM table
+ * and the admin search do not need a join, so a corrected spelling has to be
+ * pushed into those rows too — otherwise the fix is invisible everywhere the
+ * team actually looks.
+ */
+export const updateCustomer = mutation({
+  args: {
+    userId: v.id("users"),
+    fullName: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    marketingOptIn: v.optional(v.boolean()),
+    whatsappOptIn: v.optional(v.boolean()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const staff = await requirePermission(ctx, PERMISSIONS.CUSTOMER_EDIT);
+
+    const target = await ctx.db.get(args.userId);
+    if (!target) authError("NOT_FOUND", "That user no longer exists.");
+
+    // Colleagues' records are managed from the staff screens, which carry the
+    // rank guards. `customer:edit` is not a way around them.
+    if (isStaffRole(target.role)) {
+      throw new ConvexError({
+        code: "VALIDATION",
+        message: "Use the staff screens to edit a colleague's details.",
+      });
+    }
+
+    const patch: Partial<Doc<"users">> = {};
+
+    if (args.fullName !== undefined) {
+      const name = args.fullName.trim();
+      if (name.length < 2) {
+        throw new ConvexError({
+          code: "VALIDATION",
+          message: "Enter the customer's full name.",
+        });
+      }
+      patch.fullName = name;
+    }
+    if (args.phone !== undefined) {
+      patch.phone = args.phone.trim() || undefined;
+    }
+    if (args.marketingOptIn !== undefined) {
+      patch.marketingOptIn = args.marketingOptIn;
+    }
+    if (args.whatsappOptIn !== undefined) {
+      patch.whatsappOptIn = args.whatsappOptIn;
+    }
+
+    if (Object.keys(patch).length === 0) return null;
+
+    const { before, after } = diffFields(
+      target as unknown as Record<string, unknown>,
+      patch as Record<string, unknown>,
+    );
+
+    await ctx.db.patch(target._id, patch);
+
+    // Bounded by `.take`: a prolific customer must not blow the write limit.
+    if (patch.fullName !== undefined || patch.phone !== undefined) {
+      const applications = await ctx.db
+        .query("applications")
+        .withIndex("by_userId", (q) => q.eq("userId", target._id))
+        .order("desc")
+        .take(100);
+
+      for (const application of applications) {
+        await ctx.db.patch(application._id, {
+          ...(patch.fullName !== undefined
+            ? { customerName: patch.fullName }
+            : {}),
+          ...(patch.phone !== undefined ? { customerPhone: patch.phone } : {}),
+          updatedAt: Date.now(),
+        });
+      }
+    }
+
+    await recordAudit(ctx, {
+      actor: staff.user,
+      action: AUDIT_ACTIONS.CUSTOMER_UPDATED,
+      entityType: "user",
+      entityId: target._id,
+      summary: `Updated ${target.fullName}'s contact details`,
+      before,
+      after,
+    });
+
+    return null;
+  },
+});
+
 /**
  * Change someone's role.
  *
@@ -617,6 +765,28 @@ export const inviteStaff = mutation({
     let wasPromotion = false;
 
     if (existing) {
+      // Re-inviting an address that already has an account is a role change,
+      // so it carries the same two guards `setRole` does. Without them this
+      // is a one-call demotion of anybody — including the owner — by anyone
+      // holding `staff:manage`.
+      if (!allowed.includes(existing.role as UserRole)) {
+        authError(
+          "FORBIDDEN",
+          "You cannot change the role of a user who outranks you.",
+        );
+      }
+      if (
+        existing.role === "super_admin" &&
+        args.role !== "super_admin" &&
+        (await activeSuperAdminCount(ctx)) <= 1
+      ) {
+        throw new ConvexError({
+          code: "LAST_SUPER_ADMIN",
+          message:
+            "This is the only active super admin. Promote someone else before changing this role.",
+        });
+      }
+
       wasPromotion = true;
       await ctx.db.patch(existing._id, {
         role: args.role,
@@ -684,6 +854,55 @@ export const updateStaffProfile = mutation({
       });
     }
 
+    // A super admin's profile is only editable by another super admin. An
+    // admin holds `staff:manage`, but letting them flip `isActive` on the
+    // owner's profile would be a lockout by a different door than
+    // `deactivateStaff`, which already refuses it.
+    if (target.role === "super_admin" && staff.role !== "super_admin") {
+      authError(
+        "FORBIDDEN",
+        "Only a super admin can edit another super admin's staff profile.",
+      );
+    }
+
+    // `extraPermissions` is free-form text on the way in, so it is checked
+    // against the catalogue — and against what the actor actually holds. A
+    // grant you cannot make yourself is not one you can hand to someone else,
+    // which is what keeps `staff:manage` from being a route to `staff:assign_role`.
+    const known = new Set<string>(Object.values(PERMISSIONS));
+    for (const list of [args.extraPermissions, args.revokedPermissions]) {
+      for (const permission of list ?? []) {
+        if (!known.has(permission)) {
+          throw new ConvexError({
+            code: "VALIDATION",
+            message: `"${permission}" is not a known permission.`,
+          });
+        }
+      }
+    }
+    for (const permission of args.extraPermissions ?? []) {
+      if (!staff.permissions.has(permission)) {
+        authError(
+          "FORBIDDEN",
+          `You cannot grant "${permission}" because you do not hold it yourself.`,
+        );
+      }
+    }
+
+    // Deactivating through the profile editor must not strand the deployment
+    // any more than `deactivateStaff` may.
+    if (
+      args.isActive === false &&
+      target.role === "super_admin" &&
+      (await activeSuperAdminCount(ctx)) <= 1
+    ) {
+      throw new ConvexError({
+        code: "LAST_SUPER_ADMIN",
+        message:
+          "This is the only active super admin and cannot be deactivated.",
+      });
+    }
+
     const profile = await loadStaffProfile(ctx, target._id);
     if (!profile) {
       authError("NOT_FOUND", "That staff member has no profile yet.");
@@ -721,6 +940,72 @@ export const updateStaffProfile = mutation({
       summary: `Updated the staff profile for ${target.fullName}`,
       before,
       after,
+    });
+
+    return null;
+  },
+});
+
+/**
+ * Attach a freshly provisioned Clerk account to an invited colleague's row.
+ *
+ * `inviteStaff` parks a new colleague on a `pending:<email>` sentinel. When an
+ * operator creates the Clerk account for them (rather than waiting for the
+ * person to sign up themselves) this closes the loop immediately, so the role
+ * is live at first sign-in without depending on the webhook or on matching by
+ * email.
+ *
+ * Deliberately narrow: it only ever rewrites a `pending:` placeholder, and
+ * only onto a Clerk id nobody else holds. Without those two guards a
+ * `staff:manage` holder could repoint any colleague's row at an account they
+ * control, which is account takeover with extra steps.
+ */
+export const linkClerkAccount = mutation({
+  args: { userId: v.id("users"), clerkId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const staff = await requirePermission(ctx, PERMISSIONS.STAFF_MANAGE);
+
+    const clerkId = args.clerkId.trim();
+    if (clerkId.length === 0 || clerkId.startsWith("pending:")) {
+      throw new ConvexError({
+        code: "VALIDATION",
+        message: "That is not a usable Clerk account id.",
+      });
+    }
+
+    const target = await ctx.db.get(args.userId);
+    if (!target) authError("NOT_FOUND", "That user no longer exists.");
+
+    if (!target.clerkId.startsWith("pending:")) {
+      throw new ConvexError({
+        code: "ALREADY_LINKED",
+        message:
+          "That colleague already has a sign-in linked. Ask them to use it, or reset the password from Clerk.",
+      });
+    }
+
+    const clash = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+      .unique();
+    if (clash) {
+      throw new ConvexError({
+        code: "CONFLICT",
+        message: "That sign-in is already attached to another VisaDrive user.",
+      });
+    }
+
+    await ctx.db.patch(target._id, { clerkId, emailVerified: true });
+
+    await recordAudit(ctx, {
+      actor: staff.user,
+      action: "staff.sign_in_linked",
+      entityType: "staff",
+      entityId: target._id,
+      summary: `Linked a sign-in to ${target.fullName} (${target.email})`,
+      before: { clerkId: target.clerkId },
+      after: { clerkId },
     });
 
     return null;
@@ -804,7 +1089,7 @@ interface ClerkIdentityFields {
 async function applyClerkIdentity(
   ctx: MutationCtx,
   args: ClerkIdentityFields,
-): Promise<Id<"users">> {
+): Promise<Id<"users"> | null> {
   const email = normaliseEmail(args.email);
   const fullName = args.fullName.trim() || email.split("@")[0];
 
@@ -833,12 +1118,27 @@ async function applyClerkIdentity(
 
   // An invited colleague signing in for the first time: link the placeholder
   // row (which already carries the role we granted) to their Clerk account.
+  //
+  // Taking over an existing row by email is the single most valuable move an
+  // attacker can make here — it inherits that row's role, its applications and
+  // its documents. So it is only done when Clerk says the address is verified.
+  // An unverified claim gets nothing at all: no link, and no second row on the
+  // same address that a later verification could not tell apart. The caller
+  // sees "still setting up" and the next sync, once they have confirmed the
+  // inbox, succeeds.
   const byEmail = await ctx.db
     .query("users")
     .withIndex("by_email", (q) => q.eq("email", email))
     .first();
 
   if (byEmail) {
+    if (args.emailVerified !== true) {
+      console.warn(
+        "[users] refused to link an unverified identity to an existing email",
+        args.clerkId,
+      );
+      return null;
+    }
     await ctx.db.patch(byEmail._id, {
       ...identityPatch,
       clerkId: args.clerkId,
@@ -889,7 +1189,9 @@ export const upsertFromClerk = internalMutation({
     phone: v.optional(v.string()),
     emailVerified: v.optional(v.boolean()),
   },
-  returns: v.id("users"),
+  // `null` when the event could not be applied safely — today that means an
+  // unverified address that already belongs to somebody else.
+  returns: v.union(v.id("users"), v.null()),
   handler: async (ctx, args) => await applyClerkIdentity(ctx, args),
 });
 
@@ -950,6 +1252,9 @@ export const syncFromClerk = mutation({
       phone: identity.phoneNumber,
       emailVerified: identity.emailVerified ?? false,
     });
+
+    // The address is already somebody's and this token has not proved it.
+    if (userId === null) return { status: "incomplete" as const };
 
     return { status: "ready" as const, userId };
   },

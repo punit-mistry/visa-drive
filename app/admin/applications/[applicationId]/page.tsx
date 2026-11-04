@@ -7,6 +7,7 @@ import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   ArrowLeft,
   Download,
+  Eye,
   Loader2,
   Mail,
   MessageCircle,
@@ -24,6 +25,10 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentViewer } from "@/components/admin/document-viewer";
+import { EditCustomerDialog } from "@/components/admin/edit-customer-dialog";
+import { EditTripDialog } from "@/components/admin/edit-trip-dialog";
+import { EditTravellerDialog } from "@/components/admin/edit-traveller-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   ApplicationStatusBadge,
@@ -68,6 +73,7 @@ export default function AdminApplicationDetailPage() {
   const canUpdateStatus = can(PERMISSIONS.APPLICATION_UPDATE_STATUS);
   const canAssign = can(PERMISSIONS.APPLICATION_ASSIGN);
   const canViewStaff = can(PERMISSIONS.STAFF_VIEW);
+  const canEditCustomer = can(PERMISSIONS.CUSTOMER_EDIT);
   const staff = useQuery(api.users.listStaff, canViewStaff ? {} : "skip");
 
   const [nextStatus, setNextStatus] = useState<ApplicationStatus | "">("");
@@ -79,6 +85,7 @@ export default function AdminApplicationDetailPage() {
   const [agentId, setAgentId] = useState<string>("");
   const [savingAgent, setSavingAgent] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [viewerId, setViewerId] = useState<Id<"documents"> | null>(null);
 
   if (detail === undefined || userLoading) return <DetailSkeleton />;
   if (detail === null) {
@@ -185,8 +192,11 @@ export default function AdminApplicationDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Customer</CardTitle>
+              {canEditCustomer && detail.customer && (
+                <EditCustomerDialog customer={detail.customer} />
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               {detail.customer ? (
@@ -207,16 +217,20 @@ export default function AdminApplicationDetailPage() {
                         Email customer
                       </a>
                     </Button>
-                    <Button asChild variant="outline" size="sm">
-                      <a
-                        href={`https://wa.me/${detail.customer.phone?.replace(/\D/g, "") ?? ""}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <MessageCircle className="size-3.5" aria-hidden />
-                        WhatsApp
-                      </a>
-                    </Button>
+                    {/* No phone on file means wa.me would open a blank chat
+                        picker, which is a button that does nothing. */}
+                    {detail.customer.phone && (
+                      <Button asChild variant="outline" size="sm">
+                        <a
+                          href={`https://wa.me/${detail.customer.phone.replace(/\D/g, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <MessageCircle className="size-3.5" aria-hidden />
+                          WhatsApp
+                        </a>
+                      </Button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -228,8 +242,9 @@ export default function AdminApplicationDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Trip details</CardTitle>
+              {canUpdateStatus && <EditTripDialog application={application} />}
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <Field label="Destination" value={application.destinationName} />
@@ -281,9 +296,14 @@ export default function AdminApplicationDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Travellers</CardTitle>
-              <span className="text-xs text-muted-foreground">
-                {detail.applicants.length} on file
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {detail.applicants.length} on file
+                </span>
+                {canUpdateStatus && (
+                  <EditTravellerDialog applicationId={applicationId} />
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {detail.applicants.length === 0 ? (
@@ -301,6 +321,15 @@ export default function AdminApplicationDetailPage() {
                         {applicant.isPrimary && (
                           <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[11px] font-medium text-brand-deep">
                             Primary
+                          </span>
+                        )}
+                        {canUpdateStatus && (
+                          <span className="ml-auto">
+                            <EditTravellerDialog
+                              applicationId={applicationId}
+                              applicant={applicant}
+                              canRemove={detail.applicants.length > 1}
+                            />
                           </span>
                         )}
                       </div>
@@ -349,15 +378,24 @@ export default function AdminApplicationDetailPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => setViewerId(document._id)}
+                      >
+                        <Eye className="size-3.5" aria-hidden />
+                        View
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
                         onClick={() => openDocument(document._id)}
                         disabled={downloadingId === document._id}
+                        aria-label={`Open ${document.label} in a new tab`}
                       >
                         {downloadingId === document._id ? (
                           <Loader2 className="size-3.5 animate-spin" aria-hidden />
                         ) : (
                           <Download className="size-3.5" aria-hidden />
                         )}
-                        View
                       </Button>
                     </div>
                   </div>
@@ -640,6 +678,12 @@ export default function AdminApplicationDetailPage() {
           )}
         </div>
       </div>
+
+      <DocumentViewer
+        documents={detail.documents}
+        openId={viewerId}
+        onOpenChange={setViewerId}
+      />
     </div>
   );
 }

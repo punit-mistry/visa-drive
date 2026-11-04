@@ -10,6 +10,7 @@ import type { Doc } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { AddStaffDialog } from "@/components/admin/add-staff-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { ToneBadge } from "@/components/shared/status-badge";
 import { DataTable } from "@/components/tables/data-table";
@@ -191,6 +192,7 @@ export default function AdminStaffPage() {
       <PageHeader
         title="Staff"
         description="The VisaDrive team, their roles and the permissions those roles grant."
+        actions={can(PERMISSIONS.STAFF_MANAGE) ? <AddStaffDialog /> : undefined}
       />
 
       <Card>

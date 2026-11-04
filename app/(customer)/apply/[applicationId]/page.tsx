@@ -63,6 +63,7 @@ import { PhoneField } from "@/components/shared/phone-field";
 import { FileDropzone } from "@/components/shared/file-dropzone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DetailSkeleton, ErrorState } from "@/components/shared/states";
+import { Confetti } from "@/components/shared/confetti";
 import { DocumentStatusBadge } from "@/components/shared/status-badge";
 import { useDocumentUpload } from "@/hooks/use-document-upload";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
@@ -184,12 +185,38 @@ export default function DraftWizardPage() {
   }
 
   if (!draft.application.isDraft) {
+    // Not an error — the customer finished this one. Landing back on the
+    // wizard usually means a stale tab or the back button, so the page points
+    // at the live application rather than scolding them.
     return (
-      <ErrorState
-        title="This application has already been submitted"
-        description="You can view its status and documents from your applications page."
-        onRetry={() => router.push(`/dashboard/applications/${applicationId}`)}
-      />
+      <div className="mx-auto flex max-w-md flex-col items-center py-16 text-center">
+        <span className="animate-success-pop flex size-14 items-center justify-center rounded-full bg-success-soft text-success">
+          <BadgeCheck className="size-7" aria-hidden strokeWidth={2.2} />
+        </span>
+        <h1 className="mt-5 text-2xl font-semibold tracking-tight">
+          This application has already been submitted
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Nothing more to fill in. You can follow its status and manage its documents
+          from your applications page.
+        </p>
+        <p className="mt-4 font-mono text-sm font-semibold tracking-tight">
+          {draft.application.referenceId}
+        </p>
+        <div className="mt-7 flex w-full flex-col gap-2 sm:flex-row-reverse">
+          <Button
+            size="lg"
+            className="sm:flex-1"
+            onClick={() => router.push(`/dashboard/applications/${applicationId}`)}
+          >
+            View my application
+            <ArrowRight className="size-4" aria-hidden />
+          </Button>
+          <Button asChild variant="outline" size="lg" className="sm:flex-1">
+            <Link href="/dashboard/applications">All applications</Link>
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -407,6 +434,7 @@ function DraftWizard({
         applicationId={applicationId}
         referenceId={submitted.referenceId}
         requiresPayment={submitted.requiresPayment}
+        customerName={app.customerName}
         visaProductName={app.visaProductName}
         destinationName={app.destinationName}
         travellerCount={app.travellerCount}
@@ -2082,6 +2110,7 @@ function SubmittedScreen({
   applicationId,
   referenceId,
   requiresPayment,
+  customerName,
   visaProductName,
   destinationName,
   travellerCount,
@@ -2090,11 +2119,13 @@ function SubmittedScreen({
   applicationId: Id<"applications">;
   referenceId: string;
   requiresPayment: boolean;
+  customerName: string;
   visaProductName: string;
   destinationName: string;
   travellerCount: number;
   total: string;
 }) {
+  const firstName = customerName.trim().split(/\s+/)[0] ?? "";
   const nextSteps = [
     {
       title: requiresPayment ? "Complete your payment" : "We start the review",
@@ -2114,15 +2145,21 @@ function SubmittedScreen({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-4">
+      <Confetti />
+
       <div className="flex flex-col items-center text-center">
         <span className="animate-success-pop flex size-16 items-center justify-center rounded-full bg-success-soft text-success">
           <Check className="size-8" aria-hidden strokeWidth={2.5} />
         </span>
-        <h1 className="mt-5 text-3xl font-semibold tracking-tight">
+        <p className="animate-fade-up mt-5 text-eyebrow text-success">
           Application submitted
+        </p>
+        <h1 className="animate-fade-up mt-2 text-3xl font-semibold tracking-tight text-balance">
+          {firstName ? `Thank you, ${firstName}!` : "Thank you!"}
         </h1>
-        <p className="mt-2 max-w-md text-muted-foreground">
-          We have everything we need to begin. Keep your reference handy — it identifies
+        <p className="animate-fade-up mt-2.5 max-w-md leading-relaxed text-muted-foreground">
+          Your {visaProductName} application for {destinationName} is with our team. We
+          have everything we need to begin — keep your reference handy, it identifies
           this application in every message from us.
         </p>
       </div>

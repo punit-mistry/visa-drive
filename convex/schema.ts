@@ -187,6 +187,12 @@ export default defineSchema({
     suspendedReason: v.optional(v.string()),
     marketingOptIn: v.optional(v.boolean()),
     whatsappOptIn: v.optional(v.boolean()),
+    /**
+     * Guided tours this person has finished or dismissed, by id. Kept on the
+     * user rather than in `localStorage` so the tour does not reintroduce
+     * itself every time they open the portal on a different device.
+     */
+    dismissedTours: v.optional(v.array(v.string())),
     createdAt: v.number(),
   })
     .index("by_clerkId", ["clerkId"])
@@ -619,6 +625,7 @@ export default defineSchema({
       v.literal("phone"),
       v.literal("referral"),
       v.literal("walk_in"),
+      v.literal("help_assistant"),
       v.literal("other"),
     ),
 

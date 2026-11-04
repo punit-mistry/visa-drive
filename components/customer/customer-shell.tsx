@@ -9,11 +9,13 @@ import {
   FileText,
   LayoutDashboard,
   PlusCircle,
+  ShieldCheck,
   User,
 } from "lucide-react";
 
 import { AccountBlockedState, AccountSetupState } from "@/components/shared/account-state";
 import { Logo } from "@/components/shared/logo";
+import { HelpAssistant } from "@/components/shared/help-assistant";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { cn } from "@/lib/utils";
@@ -39,7 +41,7 @@ const NAV_ITEMS = [
  */
 export function CustomerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isLoading, isSuspended, profileIssue } = useCurrentUser();
+  const { user, isLoading, isStaff, isSuspended, profileIssue } = useCurrentUser();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === href;
@@ -86,7 +88,16 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button asChild size="sm">
+                  {isStaff && (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/admin">
+                        <ShieldCheck className="size-4" aria-hidden />
+                        <span className="hidden sm:inline">Admin CRM</span>
+                        <span className="sm:hidden">Admin</span>
+                      </Link>
+                    </Button>
+                  )}
+                  <Button asChild size="sm" data-tour="customer-apply">
                     <Link href="/apply">
                       <PlusCircle className="size-4" aria-hidden />
                       <span className="hidden sm:inline">New application</span>
@@ -103,6 +114,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
               {/* Phone navigation: one horizontal strip, never a stacked list. */}
               <nav
                 aria-label="Customer portal"
+                data-tour="customer-nav"
                 className="scrollbar-thin container-page flex gap-1 overflow-x-auto pb-2 lg:hidden"
               >
                 {NAV_ITEMS.map((item) => {
@@ -112,6 +124,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
                     <Link
                       key={item.href}
                       href={item.href}
+                      data-tour={`customer-nav-${item.href.split("/").pop()}`}
                       aria-current={active ? "page" : undefined}
                       className={cn(
                         "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-brand",
@@ -132,6 +145,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
               <aside className="hidden lg:block">
                 <nav
                   aria-label="Customer portal"
+                  data-tour="customer-nav"
                   className="sticky top-24 flex flex-col gap-0.5"
                 >
                   {NAV_ITEMS.map((item) => {
@@ -141,6 +155,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
                       <Link
                         key={item.href}
                         href={item.href}
+                        data-tour={`customer-nav-${item.href.split("/").pop()}`}
                         aria-current={active ? "page" : undefined}
                         className={cn(
                           "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-brand",
@@ -167,6 +182,8 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
 
               <main className="min-w-0">{children}</main>
             </div>
+
+            <HelpAssistant surface="customer" />
           </div>
         )}
       </Show>

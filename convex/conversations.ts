@@ -99,7 +99,7 @@ export const createForApplication = mutation({
       // thread on an application they are allowed to see.
       const access = await requireApplicationAccess(ctx, args.applicationId);
       application = access.application;
-      viaStaff = access.viaStaff;
+      viaStaff = access.actingAsStaff;
     }
 
     // The thread always belongs to the *customer*, even when staff opened it.

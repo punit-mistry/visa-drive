@@ -59,6 +59,10 @@ export interface PublishedDestination {
   currency: string;
   productCount: number;
   startingPrice: number | null;
+  /** True when any published product here is still unverified seed content. */
+  hasDemoContent?: boolean;
+  /** Shortest advertised processing time, or null when none is configured. */
+  fastestProcessingDays?: number | null;
 }
 
 /** The minimal shape the marketing surface reads off a visa product. */

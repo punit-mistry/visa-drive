@@ -222,3 +222,29 @@ export function downloadCsv(filename: string, csv: string): void {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/* -------------------------------------------------------------------------- */
+/*                               date <-> input                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Epoch milliseconds -> the `yyyy-MM-dd` string `<input type="date">` and
+ * `DateField` both speak.
+ *
+ * The offset shift matters: `toISOString()` on its own converts to UTC first,
+ * so a date stored at local midnight in IST would come back as the day before.
+ */
+export function toDateInput(ms?: number | null): string {
+  if (!ms) return "";
+  const date = new Date(ms);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
+/** `yyyy-MM-dd` -> epoch milliseconds at local midnight, or `undefined`. */
+export function fromDateInput(value: string): number | undefined {
+  if (!value) return undefined;
+  const parsed = Date.parse(`${value}T00:00:00`);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}

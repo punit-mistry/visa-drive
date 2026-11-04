@@ -246,6 +246,34 @@
     @apply border-border outline-ring/40;
   }
 
+  html {
+    /* Reserve the scrollbar's column whether or not it is showing, so the
+     * usable width never changes. See the scroll-lock override below — the
+     * two only work as a pair. */
+    scrollbar-gutter: stable;
+  }
+
+  /* Neutralise `react-remove-scroll`'s scrollbar compensation.
+   *
+   * Every Radix overlay — Select, Dialog, Sheet, the tour — locks body scroll
+   * while it is open, and the library compensates for the scrollbar it
+   * expects to disappear by putting `margin-right: 15px !important` on the
+   * body. With `scrollbar-gutter: stable` that gutter never disappears, so
+   * the margin is 15px of compensation for nothing: the body's content box
+   * narrows and every centred container — the hero among them — slides left
+   * by half of it the moment a dropdown opens.
+   *
+   * Reserved gutter *and* no compensation means the content width is
+   * identical locked or unlocked, so there is nothing left that can move.
+   * `html body[...]` outranks the library's own `body[...] { ... !important }`
+   * on specificity, which is required because it injects its rule at runtime
+   * and would otherwise win on order. */
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+    --removed-body-scroll-bar-size: 0px;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -489,5 +517,121 @@
   100% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* ------------------------------ visa loader ------------------------------ */
+/* The stamp loader in `components/shared/visa-loader.tsx`. CSS rather than a
+ * motion component so it can run inside a server-rendered `loading.tsx` with
+ * no JavaScript on the page at all. */
+
+.vd-stamp-ring {
+  animation: vd-stamp-ring 3.2s linear infinite;
+}
+
+.vd-stamp-press {
+  animation: vd-stamp-press 1.9s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.vd-stamp-sweep {
+  animation: vd-stamp-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes vd-stamp-ring {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes vd-stamp-press {
+  0%,
+  100% {
+    transform: rotate(-6deg) scale(1);
+    opacity: 0.75;
+  }
+  45% {
+    transform: rotate(-10deg) scale(0.92);
+    opacity: 1;
+  }
+  60% {
+    transform: rotate(-4deg) scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes vd-stamp-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* One slow pulse carries the same meaning without the movement. */
+  .vd-stamp-ring,
+  .vd-stamp-sweep {
+    animation: none;
+  }
+  .vd-stamp-press {
+    animation: vd-stamp-fade 2s ease-in-out infinite;
+  }
+  @keyframes vd-stamp-fade {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
+/* ----------------------------- welcome splash ---------------------------- */
+/* See `components/marketing/welcome-splash.tsx`. The animation is the safety
+ * net: it clears the overlay on its own, so a broken or slow bundle can never
+ * leave someone staring at a locked screen. The script only shortens it. */
+
+.vd-splash {
+  animation: vd-splash-out 0.5s ease 2.7s forwards;
+}
+
+.vd-splash[data-leaving] {
+  animation: vd-splash-out 0.5s ease forwards;
+}
+
+.vd-splash-mark {
+  animation: vd-splash-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Already welcomed this session — never paint it at all. Set by the blocking
+ * head script before first paint, so there is no flash on a second page. */
+html[data-welcomed] .vd-splash {
+  display: none;
+}
+
+@keyframes vd-splash-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes vd-splash-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vd-splash-mark {
+    animation: none;
   }
 }

@@ -42,6 +42,7 @@ const sourceValidator = v.union(
   v.literal("phone"),
   v.literal("referral"),
   v.literal("walk_in"),
+  v.literal("help_assistant"),
   v.literal("other"),
 );
 

@@ -211,7 +211,7 @@ export const generateUploadUrl = mutation({
   handler: async (ctx, args) => {
     const access = await requireApplicationAccess(ctx, args.applicationId);
 
-    if (!access.viaStaff) {
+    if (!access.actingAsStaff) {
       const config =
         APPLICATION_STATUS_CONFIG[access.application.status as ApplicationStatus];
       if (!config?.customerCanUpload) {
@@ -252,7 +252,7 @@ export const attach = mutation({
     const application = access.application;
     const now = Date.now();
 
-    if (!access.viaStaff) {
+    if (!access.actingAsStaff) {
       const config =
         APPLICATION_STATUS_CONFIG[application.status as ApplicationStatus];
       if (!config?.customerCanUpload) {
@@ -344,7 +344,7 @@ export const attach = mutation({
       version: highestVersion + 1,
       supersedesId: currentPrevious?._id,
       isCurrent: true,
-      uploadedByStaffId: access.viaStaff ? access.user._id : undefined,
+      uploadedByStaffId: access.actingAsStaff ? access.user._id : undefined,
       documentRequestId: args.documentRequestId,
       createdAt: now,
     });
@@ -374,7 +374,7 @@ export const attach = mutation({
 
     // Staff get one "documents uploaded" nudge per application per day — the
     // dedupe key folds a burst of eight passport scans into a single ping.
-    if (!access.viaStaff && application.assignedAgentId) {
+    if (!access.actingAsStaff && application.assignedAgentId) {
       await ctx.scheduler.runAfter(0, internal.notifications.dispatch, {
         userId: application.assignedAgentId,
         type: NOTIFICATION_TYPES.DOCUMENTS_UPLOADED,
@@ -480,7 +480,7 @@ export const listByApplication = query({
         rejected: current.filter((d) => d.status === "rejected").length,
       },
       canUpload:
-        access.viaStaff ||
+        access.actingAsStaff ||
         (APPLICATION_STATUS_CONFIG[application.status as ApplicationStatus]
           ?.customerCanUpload ??
           false),

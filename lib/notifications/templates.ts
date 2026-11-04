@@ -1015,6 +1015,92 @@ export function welcomeEmail(data: EmailTemplateData): EmailTemplateResult {
   return { subject: `Welcome to ${SITE.name}`, html, text };
 }
 
+/* ------------------------------ staff invite ------------------------------ */
+
+export interface StaffInviteEmailData {
+  fullName: string;
+  email: string;
+  roleLabel: string;
+  /** Omitted when the colleague already had an account and kept their own. */
+  password?: string;
+  designation?: string;
+  employeeCode?: string;
+  signInUrl?: string;
+  invitedByName?: string;
+}
+
+/**
+ * The credentials mail a new colleague receives.
+ *
+ * The password is rendered once, here, and is never stored anywhere we can
+ * read it back — not in `notifications`, not in the audit log. That is why
+ * this template is called directly by the route that provisions the account
+ * rather than going through `notifications.dispatch`, which persists the body
+ * it sends.
+ */
+export function staffInviteEmail(
+  data: StaffInviteEmailData,
+): EmailTemplateResult {
+  const name = firstName(data.fullName);
+  const signInUrl = safeUrl(data.signInUrl) ?? `${PORTAL}/sign-in`;
+
+  const details: DetailRow[] = [
+    { label: "Sign-in email", value: data.email },
+    ...(data.password
+      ? [{ label: "Temporary password", value: data.password, emphasis: true }]
+      : []),
+    { label: "Role", value: data.roleLabel, emphasis: !data.password },
+    ...(data.designation
+      ? [{ label: "Designation", value: data.designation }]
+      : []),
+    ...(data.employeeCode
+      ? [{ label: "Employee code", value: data.employeeCode }]
+      : []),
+  ];
+
+  const { html, text } = renderLayout({
+    preheader: `Your ${SITE.name} staff account is ready.`,
+    heading: `Your ${SITE.name} team account`,
+    intro: [
+      `Hi ${esc(name)},`,
+      data.invitedByName
+        ? `${esc(
+            data.invitedByName,
+          )} has set up a ${esc(SITE.name)} staff account for you. Here are your sign-in details.`
+        : `A ${esc(
+            SITE.name,
+          )} staff account has been set up for you. Here are your sign-in details.`,
+    ],
+    details,
+    cta: { label: "Sign in to VisaDrive", url: signInUrl },
+    callout: data.password
+      ? {
+          title: "Change this password after your first sign-in",
+          body:
+            "This is a temporary password sent by email. Open your profile and set your own as soon as you are in, and never share it with anyone — the VisaDrive team will never ask you for it.",
+          tone: "warning",
+        }
+      : {
+          title: "Use your existing password",
+          body:
+            "You already had a VisaDrive account, so your password has not changed. Sign in exactly as you did before — the new access is attached to the same login.",
+          tone: "info",
+        },
+    outro: [
+      `Once you are in, the team tools live at <strong>${esc(
+        PORTAL,
+      )}/admin</strong>. What you can see there depends on your role.`,
+      `If you were not expecting this email, tell us on ${esc(
+        PHONE,
+      )} or ${esc(EMAIL)} and we will remove the account.`,
+    ],
+    footnote:
+      "This message contains sign-in credentials. Please do not forward it.",
+  });
+
+  return { subject: `Your ${SITE.name} team account`, html, text };
+}
+
 /* --------------------------- generic fallback ----------------------------- */
 
 /**

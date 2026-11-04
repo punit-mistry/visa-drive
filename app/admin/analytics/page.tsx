@@ -17,7 +17,9 @@ import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard, StatGrid } from "@/components/shared/stat-card";
-import { EmptyState, StatCardSkeleton } from "@/components/shared/states";
+import { EmptyState, NoAccessState, StatCardSkeleton } from "@/components/shared/states";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { PERMISSIONS } from "@/lib/constants/roles";
 import { ApplicationStatusBadge } from "@/components/shared/status-badge";
 import { formatDateRange, formatPercent } from "@/lib/helpers/format";
 import { formatMoney } from "@/lib/helpers/pricing";
@@ -37,10 +39,18 @@ const selectClass =
   "flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-brand";
 
 export default function AdminAnalyticsPage() {
+  // A refused query throws out of `useQuery` and takes the route down, so the
+  // permission is checked before anything is asked for.
+  const { can } = useCurrentUser();
+  const canView = can(PERMISSIONS.ANALYTICS_VIEW);
+
   const [rangeDays, setRangeDays] = useState(30);
   const [bucket, setBucket] = useState<Bucket>("day");
 
-  const kpis = useQuery(api.analytics.overviewKpis, { rangeDays });
+  const kpis = useQuery(
+    api.analytics.overviewKpis,
+    canView ? { rangeDays } : "skip",
+  );
   const range = kpis ? { from: kpis.from, to: kpis.to } : null;
 
   const applications = useQuery(
@@ -71,6 +81,18 @@ export default function AdminAnalyticsPage() {
     () => Math.max(1, ...(revenue?.points.map((point) => point.gross) ?? [1])),
     [revenue],
   );
+
+  if (!canView) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Analytics"
+          description="Live figures computed from application, enquiry and payment rows."
+        />
+        <NoAccessState description="Analytics is available to processing agents and above. Ask an administrator if you need it." />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

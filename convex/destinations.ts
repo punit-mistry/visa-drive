@@ -117,12 +117,34 @@ export const listPublished = query({
         ...destination,
         productCount: products.length,
         startingPrice: startingPrice(products),
+        // Free here — the products are already loaded — and it lets a surface
+        // quote `startingPrice` without fetching every product again just to
+        // find out whether the figure may be presented as official.
+        hasDemoContent: products.some((product) => product.isDemoContent),
+        fastestProcessingDays: fastestProcessingDays(products),
       });
     }
 
     return cards;
   },
 });
+
+/**
+ * The shortest advertised processing time across a destination's products.
+ *
+ * `null` unless an administrator has actually entered one — an absent figure
+ * renders as nothing at all rather than as a guess, because a processing time
+ * is the claim a traveller plans a trip around.
+ */
+function fastestProcessingDays(
+  products: { processingTimeMinDays?: number }[],
+): number | null {
+  const days = products
+    .map((product) => product.processingTimeMinDays)
+    .filter((value): value is number => typeof value === "number" && value > 0);
+
+  return days.length > 0 ? Math.min(...days) : null;
+}
 
 /**
  * Public destination page.

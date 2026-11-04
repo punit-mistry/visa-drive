@@ -2,7 +2,12 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
-import { authError, requireApplicationAccess } from "./lib/auth";
+import {
+  authError,
+  requireApplicationAccess,
+  type ApplicationAccess,
+} from "./lib/auth";
+import { PERMISSIONS } from "../lib/constants/roles";
 import { recountApplicationDocuments } from "./documents";
 import { APPLICATION_STATUS_CONFIG } from "../lib/constants/statuses";
 import type { ApplicationStatus } from "../lib/constants/statuses";
@@ -53,15 +58,35 @@ const applicantDataValidator = v.object({
 });
 
 /**
- * Customers may edit traveller details only while the application still
- * accepts their input; staff may always correct a typo (their access was
- * already checked by `requireApplicationAccess`).
+ * Who may rewrite a traveller row, and when.
+ *
+ * Two separate gates, because these fields are passport numbers and dates of
+ * birth rather than a note:
+ *
+ *  • Staff need `application:update_status` — the grant that marks someone as
+ *    able to change a booking. Being able to *see* every application (a
+ *    support agent does) is not the same as being able to rewrite one.
+ *  • Everyone else is the customer, and may only edit while the application is
+ *    still taking their input. A colleague editing their own booking lands
+ *    here too when they lack the staff grant, which is the right answer.
  */
 function assertEditable(
   application: Doc<"applications">,
-  viaStaff: boolean,
+  access: ApplicationAccess,
 ): void {
-  if (viaStaff) return;
+  const staffMayEdit =
+    access.viaStaff &&
+    access.staff?.permissions.has(PERMISSIONS.APPLICATION_UPDATE_STATUS) === true;
+
+  if (staffMayEdit) return;
+
+  if (access.actingAsStaff) {
+    authError(
+      "FORBIDDEN",
+      "You do not have permission to edit the travellers on this application.",
+    );
+  }
+
   const config = APPLICATION_STATUS_CONFIG[application.status as ApplicationStatus];
   if (!config?.customerCanUpload) {
     throw new ConvexError({
@@ -95,7 +120,7 @@ export const upsert = mutation({
   handler: async (ctx, args) => {
     const access = await requireApplicationAccess(ctx, args.applicationId);
     const application = access.application;
-    assertEditable(application, access.viaStaff);
+    assertEditable(application, access);
 
     const now = Date.now();
     const { isPrimary, travelerId, ...fields } = args.data;
@@ -191,7 +216,7 @@ export const remove = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const access = await requireApplicationAccess(ctx, args.applicationId);
-    assertEditable(access.application, access.viaStaff);
+    assertEditable(access.application, access);
 
     const applicant = await ctx.db.get(args.applicantId);
     if (!applicant || applicant.applicationId !== args.applicationId) {
@@ -246,7 +271,7 @@ export const reorder = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const access = await requireApplicationAccess(ctx, args.applicationId);
-    assertEditable(access.application, access.viaStaff);
+    assertEditable(access.application, access);
 
     const siblings = await ctx.db
       .query("applicants")

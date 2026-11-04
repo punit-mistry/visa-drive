@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { PERMISSIONS } from "@/lib/constants/roles";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader, SectionHeader } from "@/components/shared/page-header";
@@ -37,7 +39,18 @@ import type {
 } from "@/lib/constants/statuses";
 
 export default function AdminDashboardPage() {
-  const summary = useQuery(api.admin.dashboardSummary, { rangeDays: 30 });
+  // Every staff role lands here, but the KPI block is analytics data and a
+  // support agent does not hold `analytics:view`. Asking for it anyway threw
+  // a FORBIDDEN out of `useQuery`, which takes the whole page down — so the
+  // query is skipped and the work queue, which only needs a staff session,
+  // renders on its own.
+  const { can } = useCurrentUser();
+  const canSeeAnalytics = can(PERMISSIONS.ANALYTICS_VIEW);
+
+  const summary = useQuery(
+    api.admin.dashboardSummary,
+    canSeeAnalytics ? { rangeDays: 30 } : "skip",
+  );
   const queue = useQuery(api.admin.pendingWorkQueue, { limit: 6 });
 
   return (
@@ -46,16 +59,18 @@ export default function AdminDashboardPage() {
         title="Operations dashboard"
         description="Everything needing attention across applications, documents, payments and leads."
         actions={
-          <Button asChild variant="outline">
-            <Link href="/admin/analytics">
-              <BarChart3 className="size-4" aria-hidden />
-              Full analytics
-            </Link>
-          </Button>
+          canSeeAnalytics ? (
+            <Button asChild variant="outline">
+              <Link href="/admin/analytics">
+                <BarChart3 className="size-4" aria-hidden />
+                Full analytics
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 
-      {summary === undefined ? (
+      {!canSeeAnalytics ? null : summary === undefined ? (
         <StatCardSkeleton count={8} />
       ) : (
         <>

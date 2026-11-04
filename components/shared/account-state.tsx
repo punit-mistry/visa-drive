@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { VisaLoader } from "@/components/shared/visa-loader";
 
 /**
  * Portal states that exist between "Clerk says you are signed in" and "Convex
@@ -16,9 +17,12 @@ import { Button } from "@/components/ui/button";
 export function AccountSetupState({ stalled = false }: { stalled?: boolean }) {
   if (!stalled) {
     return (
-      <div className="container-page flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3 text-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
-        <p className="text-sm text-muted-foreground">Setting up your account…</p>
+      <div className="container-page">
+        <VisaLoader
+          fullscreen
+          label="Setting up your account"
+          hint="This takes a moment the first time you sign in."
+        />
       </div>
     );
   }
