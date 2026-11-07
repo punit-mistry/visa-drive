@@ -274,7 +274,7 @@ export function PassportCanvas({ className }: { className?: string }) {
             ))}
           </div>
         ) : available.length === 0 ? (
-          <p className="text-sm text-white/55">
+          <p className="text-sm text-muted-foreground">
             Our destination catalogue is being set up.{" "}
             <Link
               href="/contact"
@@ -298,7 +298,7 @@ export function PassportCanvas({ className }: { className?: string }) {
                       "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all focus-brand",
                       active
                         ? "border-brand bg-brand text-brand-foreground elev-sm"
-                        : "border-white/20 bg-white/5 text-white/80 hover:-translate-y-px hover:border-white/40 hover:text-white",
+                        : "border-border-strong bg-card text-foreground/75 hover:-translate-y-px hover:border-foreground/30 hover:text-foreground",
                     )}
                   >
                     <span aria-hidden>{destination.flagEmoji}</span>
@@ -321,7 +321,7 @@ export function PassportCanvas({ className }: { className?: string }) {
                     transition={{ duration: 0.2 }}
                     className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
                   >
-                    <span className="text-white/55">
+                    <span className="text-muted-foreground">
                       {activeStamp.name} appointments, handled end to end.
                     </span>
                     <Link

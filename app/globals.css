@@ -333,7 +333,9 @@
   /* Editorial width. Wide enough to still read as full-bleed on a laptop,
      but with a real ceiling: past about 1760px a line of body copy stops
      being scannable and a two-column grid starts pulling its halves apart.
-     Beyond that the gutters grow instead of the content. */
+     Beyond that the gutters grow instead of the content.
+     NOTE: site-header.tsx animates its resting max-width and has to match
+     this number, since the nav's logo lines up with the content below it. */
   .container-wide {
     @apply mx-auto w-full max-w-[1760px] px-5 sm:px-8 lg:px-12 xl:px-16 2xl:px-24;
   }
