@@ -73,21 +73,44 @@ export function Hero() {
   });
 
   return (
-    <section className="relative bg-surface pt-24 pb-14 lg:pt-28 lg:pb-16">
-      <div className="container-wide">
-        <div className="grid items-center gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:gap-14">
-          {/* ------------------------------ copy ---------------------------- */}
-          <div>
+    <section className="relative isolate flex min-h-[90svh] flex-col justify-end overflow-hidden bg-ink-black pt-28 pb-12 lg:min-h-[94svh] lg:pb-16">
+      {/* ----------------------------- backdrop --------------------------- */}
+      {/* The poster is the real picture — it is what a phone, a metered
+          connection and reduced motion all get. The clip only ever adds to
+          it, and fades in once it can actually play. */}
+      <div aria-hidden className="absolute inset-0 -z-10">
+        <Image
+          src={HERO_POSTER}
+          alt=""
+          fill
+          priority
+          fetchPriority="high"
+          sizes="100vw"
+          quality={72}
+          className="object-cover object-center"
+        />
+        <AmbientVideo src={HERO_VIDEO} />
+      </div>
+
+      {/* One scrim, weighted to the bottom where the type sits, so the sky
+          at the top of the frame stays the picture rather than a grey wash. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-gradient-to-t from-ink-black from-10% via-ink-black/65 via-50% to-ink-black/15"
+      />
+
+      <div className="container-wide relative">
+        <div className="max-w-3xl">
             <p
               {...rise(0)}
-              className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55"
             >
               <span>Visa applications</span>
-              <span aria-hidden className="h-px w-6 bg-border-strong" />
+              <span aria-hidden className="h-px w-6 bg-white/25" />
               <span>Khar West · Mumbai</span>
             </p>
 
-            <h1 {...rise(1)} className="display-hero mt-4 max-w-[15ch] text-foreground">
+            <h1 {...rise(1)} className="display-hero mt-4 max-w-[15ch] text-white">
               Apply for your visa.
               <br />
               <span className="text-brand">We handle the rest.</span>
@@ -95,21 +118,21 @@ export function Hero() {
 
             <p
               {...rise(2)}
-              className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground"
+              className="mt-4 max-w-xl text-[15px] leading-relaxed text-white/70"
             >
               {SITE.heroSubline}
             </p>
 
             <ul
               {...rise(3)}
-              className="mt-7 flex flex-col gap-2.5 border-t border-border pt-5 sm:flex-row sm:flex-wrap sm:gap-x-7 sm:gap-y-2.5"
+              className="mt-7 flex flex-col gap-2.5 border-t border-white/15 pt-5 sm:flex-row sm:flex-wrap sm:gap-x-7 sm:gap-y-2.5"
             >
               {ASSURANCES.map((item) => {
                 const Icon = item.icon;
                 return (
                   <li
                     key={item.label}
-                    className="flex items-center gap-2 text-[13px] text-muted-foreground"
+                    className="flex items-center gap-2 text-[13px] text-white/65"
                   >
                     <Icon className="size-3.5 shrink-0 text-brand" aria-hidden />
                     {item.label}
@@ -119,31 +142,11 @@ export function Hero() {
             </ul>
           </div>
 
-          {/* ----------------------------- picture -------------------------- */}
-          {/* One clean image, contained and cropped to a steady ratio, rather
-              than a full-screen wash the type has to fight. */}
-          <div
-            {...rise(2)}
-            className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-surface-strong lg:aspect-[5/4]"
-          >
-            <Image
-              src={HERO_POSTER}
-              alt="An aircraft on approach to New York — the destination VisaDrive files for most often"
-              fill
-              priority
-              fetchPriority="high"
-              sizes="(min-width: 1024px) 48vw, 100vw"
-              quality={72}
-              className="object-cover object-center"
-            />
-            <AmbientVideo src={HERO_VIDEO} />
-          </div>
-        </div>
-
         {/* ------------------------------ search ---------------------------- */}
-        {/* Floats over the seam between the frame above and the page below.
-            It is the point of the whole section, so it gets the one shadow. */}
-        <div {...rise(4)} className="relative z-10 mt-8 lg:-mt-12">
+        {/* The point of the whole frame: a visitor who already knows where
+            they are going can start without reading a word. It is the one
+            light object on the clip, which is what makes it the subject. */}
+        <div {...rise(4)} className="relative z-10 mt-8">
           <VisaDiscoveryForm />
         </div>
 
@@ -191,7 +194,7 @@ function DestinationStrip({
 
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
         Popular right now
       </p>
 
@@ -225,7 +228,7 @@ function DestinationStrip({
       </ul>
 
       {anyUnverified && (
-        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-white/50">
           <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden />
           Sample pricing — these figures have not been verified against an official
           source yet.

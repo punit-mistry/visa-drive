@@ -70,12 +70,22 @@ export function SiteHeader() {
   // without an effect that sets state after every route change.
   const mobileOpen = drawer?.pathname === pathname && drawer.open;
 
+  /**
+   * The homepage opens on a full-bleed clip, so the bar overlaps it instead
+   * of pushing it down, and goes transparent until the page has moved. Every
+   * other route has paper under the bar from the first paint.
+   */
+  const overHero = pathname === "/";
+  const onDark = overHero && !scrolled;
+
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <>
-      <header className="sticky inset-x-0 top-0 z-50">
+      <header
+        className={cn("inset-x-0 top-0 z-50", overHero ? "fixed" : "sticky")}
+      >
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:elev-md"
@@ -92,11 +102,15 @@ export function SiteHeader() {
             // page with the blur and the backdrop once the page has moved,
             // which is quieter than a hairline and does the same job.
             "transition-colors duration-300 ease-out motion-reduce:transition-none",
-            scrolled ? "bg-background/90 backdrop-blur-xl" : "bg-background",
+            onDark
+              ? "bg-transparent"
+              : scrolled
+                ? "bg-background/90 backdrop-blur-xl"
+                : "bg-background",
           )}
         >
           <div className="flex items-center gap-10">
-            <Logo size="md" />
+            <Logo size="md" onDark={onDark} />
 
             <nav aria-label="Main" className="hidden lg:block">
               <ul className="flex items-center gap-1">
@@ -107,9 +121,13 @@ export function SiteHeader() {
                       aria-current={isActive(item.href) ? "page" : undefined}
                       className={cn(
                         "rounded-md px-3 py-2 text-[13px] font-medium tracking-wide transition-colors focus-brand",
-                        isActive(item.href)
-                          ? "text-foreground"
-                          : "text-muted-foreground hover:text-foreground",
+                        onDark
+                          ? isActive(item.href)
+                            ? "text-white"
+                            : "text-white/65 hover:text-white"
+                          : isActive(item.href)
+                            ? "text-foreground"
+                            : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       {item.label}
@@ -124,7 +142,10 @@ export function SiteHeader() {
             <a
               href={`tel:+${phoneDigits(settings.phone)}`}
               className={cn(
-                "hidden items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-brand xl:inline-flex",
+                "hidden items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition-colors focus-brand xl:inline-flex",
+                onDark
+                  ? "text-white/65 hover:text-white"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Phone className="size-4" aria-hidden />
@@ -137,7 +158,11 @@ export function SiteHeader() {
                   asChild
                   size="sm"
                   variant="outline"
-                  className="hidden sm:inline-flex"
+                  className={cn(
+                    "hidden sm:inline-flex",
+                    onDark &&
+                      "border-white/30 bg-white/10 text-white hover:border-white/50 hover:bg-white/20 hover:text-white",
+                  )}
                 >
                   <Link href="/dashboard">My dashboard</Link>
                 </Button>
@@ -145,7 +170,11 @@ export function SiteHeader() {
                   asChild
                   size="sm"
                   variant="outline"
-                  className="hidden sm:inline-flex"
+                  className={cn(
+                    "hidden sm:inline-flex",
+                    onDark &&
+                      "border-white/30 bg-white/10 text-white hover:border-white/50 hover:bg-white/20 hover:text-white",
+                  )}
                 >
                   <Link href="/sign-out">Sign out</Link>
                 </Button>
@@ -167,7 +196,11 @@ export function SiteHeader() {
                   asChild
                   variant="ghost"
                   size="sm"
-                  className="hidden sm:inline-flex"
+                  className={cn(
+                    "hidden sm:inline-flex",
+                    onDark &&
+                      "border-white/30 bg-white/10 text-white hover:border-white/50 hover:bg-white/20 hover:text-white",
+                  )}
                 >
                   <Link href="/sign-in">Sign in</Link>
                 </Button>
@@ -185,7 +218,7 @@ export function SiteHeader() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="lg:hidden"
+                  className={cn("lg:hidden", onDark && "text-white hover:bg-white/10 hover:text-white")}
                   aria-label="Open menu"
                 >
                   <Menu className="size-5" aria-hidden />
