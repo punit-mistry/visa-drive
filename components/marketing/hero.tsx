@@ -4,10 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, FileCheck2, Headset, ShieldCheck } from "lucide-react";
 import { useQuery } from "convex/react";
-import { useMemo } from "react";
 
 import { api } from "@/convex/_generated/api";
 import type { PublishedDestination } from "@/components/marketing/catalogue";
+import { AmbientVideo } from "@/components/marketing/ambient-video";
 import { VisaDiscoveryForm } from "@/components/marketing/visa-discovery-form";
 import { CountryFlag } from "@/components/shared/country-flag";
 import { VisaLoader } from "@/components/shared/visa-loader";
@@ -44,8 +44,8 @@ import { SITE } from "@/lib/constants/site";
  * The United States. It is the bulk of the work that actually comes through
  * the door, so it is what the first screen shows.
  */
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=1600&q=70";
+const HERO_POSTER = "/media/newyork-approach.jpg";
+const HERO_VIDEO = "/media/newyork-approach.mp4";
 
 /** Three promises the rest of the site has to keep, and does. */
 const ASSURANCES = [
@@ -55,25 +55,12 @@ const ASSURANCES = [
 ];
 
 export function Hero() {
-  /**
-   * The United States leads the rail, because it is the bulk of the work that
-   * actually comes through the door — the hero should open on what we do most
-   * of, not on whatever sits first in the catalogue order.
-   *
-   * Fetched a little wider than the six shown so the US is still reachable
-   * when an admin has ordered it further down, then trimmed back to six.
-   */
-  const published = useQuery(api.destinations.listPublished, { limit: 10 }) as
+  // `destinations.listPublished` already leads with the United States, for
+  // every surface at once, so the rail just takes what it is given.
+  const destinations = useQuery(api.destinations.listPublished, { limit: 6 }) as
     | PublishedDestination[]
     | undefined;
 
-  const destinations = useMemo(() => {
-    if (!published) return undefined;
-    const isUs = (d: PublishedDestination) => d.countryCode?.toUpperCase() === "US";
-    return [...published]
-      .sort((x, y) => Number(isUs(y)) - Number(isUs(x)))
-      .slice(0, 6);
-  }, [published]);
 
   /**
    * `step` is the element's place in the entrance cascade, not a delay in
@@ -140,8 +127,8 @@ export function Hero() {
             className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-surface-strong lg:aspect-[5/4]"
           >
             <Image
-              src={HERO_IMAGE}
-              alt="The United States — the destination VisaDrive files for most often"
+              src={HERO_POSTER}
+              alt="An aircraft on approach to New York — the destination VisaDrive files for most often"
               fill
               priority
               fetchPriority="high"
@@ -149,16 +136,14 @@ export function Hero() {
               quality={72}
               className="object-cover object-center"
             />
+            <AmbientVideo src={HERO_VIDEO} />
           </div>
         </div>
 
         {/* ------------------------------ search ---------------------------- */}
         {/* Floats over the seam between the frame above and the page below.
             It is the point of the whole section, so it gets the one shadow. */}
-        <div
-          {...rise(4)}
-          className="elev-lg relative z-10 mt-8 rounded-2xl border border-border bg-background p-3 sm:p-4 lg:-mt-10"
-        >
+        <div {...rise(4)} className="relative z-10 mt-8 lg:-mt-12">
           <VisaDiscoveryForm />
         </div>
 

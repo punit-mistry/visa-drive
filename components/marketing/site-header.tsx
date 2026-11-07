@@ -88,10 +88,11 @@ export function SiteHeader() {
             // Only colour moves, and it moves on a CSS transition: paint is
             // cheap, and the bar does not need physics to justify itself.
             "container-wide flex h-16 items-center justify-between gap-4",
-            "border-b transition-colors duration-300 ease-out motion-reduce:transition-none",
-            scrolled
-              ? "border-border bg-background/90 backdrop-blur-xl"
-              : "border-transparent bg-background",
+            // No rule under the bar at all. It separates itself from the
+            // page with the blur and the backdrop once the page has moved,
+            // which is quieter than a hairline and does the same job.
+            "transition-colors duration-300 ease-out motion-reduce:transition-none",
+            scrolled ? "bg-background/90 backdrop-blur-xl" : "bg-background",
           )}
         >
           <div className="flex items-center gap-10">

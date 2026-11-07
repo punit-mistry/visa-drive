@@ -862,3 +862,28 @@ html[data-welcomed] .vd-splash {
     letter-spacing: -0.02em;
   }
 }
+
+/* ---------------------------------------------------------------------
+   Ambient drift.
+   Two soft fields that wander behind a section. Deliberately slow and
+   deliberately faint: this is atmosphere, and the moment it is legible
+   as a shape it has become decoration competing with the type. Removed
+   entirely under reduced motion rather than slowed down.
+   ------------------------------------------------------------------ */
+@keyframes vd-drift-a {
+  0%   { transform: translate3d(-6%, -4%, 0) scale(1); }
+  50%  { transform: translate3d(8%, 6%, 0) scale(1.12); }
+  100% { transform: translate3d(-6%, -4%, 0) scale(1); }
+}
+@keyframes vd-drift-b {
+  0%   { transform: translate3d(5%, 7%, 0) scale(1.08); }
+  50%  { transform: translate3d(-7%, -5%, 0) scale(1); }
+  100% { transform: translate3d(5%, 7%, 0) scale(1.08); }
+}
+@layer utilities {
+  .vd-drift-a { animation: vd-drift-a 26s ease-in-out infinite; will-change: transform; }
+  .vd-drift-b { animation: vd-drift-b 34s ease-in-out infinite; will-change: transform; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vd-drift-a, .vd-drift-b { animation: none; }
+}

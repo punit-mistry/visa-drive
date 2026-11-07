@@ -40,7 +40,23 @@ export function DestinationEditorial({ limit = 6 }: { limit?: number }) {
   const { byDestination } = useDestinationProducts();
 
   return (
-    <section id="destinations" className="bg-paper py-20 sm:py-24 lg:py-32">
+    <section
+      id="destinations"
+      className="relative isolate overflow-hidden bg-paper py-20 sm:py-24 lg:py-32"
+    >
+      {/*
+        Ambient red, drifting behind the grid.
+
+        Held at a few percent on purpose. Red is the signal colour in this
+        product — it means "act on this" — so a field of it this faint is
+        the most it can be without starting to compete with the buttons it
+        is supposed to leave alone.
+      */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="vd-drift-a absolute -left-[12%] top-[-18%] size-[45rem] rounded-full bg-[radial-gradient(circle,var(--brand)_0%,transparent_68%)] opacity-[0.07]" />
+        <div className="vd-drift-b absolute -right-[14%] bottom-[-22%] size-[38rem] rounded-full bg-[radial-gradient(circle,var(--brand)_0%,transparent_70%)] opacity-[0.05]" />
+      </div>
+
       <div className="container-wide">
         <Reveal className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-3xl">

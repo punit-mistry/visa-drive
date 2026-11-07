@@ -4,6 +4,7 @@ import { DestinationEditorial } from "@/components/marketing/destination-editori
 import { FaqSection } from "@/components/marketing/faq-section";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { Hero } from "@/components/marketing/hero";
+import { PlaneCursor } from "@/components/marketing/plane-cursor";
 import { PassportSection } from "@/components/marketing/passport-section";
 import { ServicesEditorial } from "@/components/marketing/services-editorial";
 import { Testimonials } from "@/components/marketing/testimonials";
@@ -40,6 +41,9 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <>
+      {/* Homepage only: decoration has no business over a booking form. */}
+      <PlaneCursor />
+
       <Hero />
       <DestinationEditorial />
       <WhoWeAre />

@@ -28,6 +28,9 @@ import { startingPrice } from "../lib/helpers/pricing";
 /** Hard cap on catalogue reads so a public query can never run unbounded. */
 const CATALOGUE_LIMIT = 200;
 
+/** The destination that leads every published list. See `listPublished`. */
+const LEAD_COUNTRY_CODE = "US";
+
 /* -------------------------------------------------------------------------- */
 /*                                   slugs                                    */
 /* -------------------------------------------------------------------------- */
@@ -103,11 +106,32 @@ async function productsFor(
 export const listPublished = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const destinations = await ctx.db
+    const limit = Math.min(args.limit ?? CATALOGUE_LIMIT, CATALOGUE_LIMIT);
+
+    /**
+     * The United States leads every list on the site.
+     *
+     * It is the bulk of the work that actually comes through the door, so
+     * it should not depend on where an admin happened to drag it in the
+     * catalogue order. Deciding it here rather than in each of the seven
+     * surfaces that read this query means they cannot disagree.
+     *
+     * The whole published set is read before the cut, so the US is still
+     * first even when its `displayOrder` puts it past the limit. Products
+     * are then loaded only for the rows that survive the slice.
+     */
+    const all = await ctx.db
       .query("destinations")
       .withIndex("by_published_order", (q) => q.eq("isPublished", true))
       .order("asc")
-      .take(Math.min(args.limit ?? CATALOGUE_LIMIT, CATALOGUE_LIMIT));
+      .take(CATALOGUE_LIMIT);
+
+    const leads = (d: (typeof all)[number]) =>
+      d.countryCode?.toUpperCase() === LEAD_COUNTRY_CODE;
+
+    const destinations = [...all]
+      .sort((a, b) => Number(leads(b)) - Number(leads(a)))
+      .slice(0, limit);
 
     const cards = [];
     // One indexed read per destination - never a scan across all products.
