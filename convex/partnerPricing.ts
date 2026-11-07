@@ -5,6 +5,7 @@ import { mutation, query } from "./_generated/server";
 import { partnerPricingMode } from "./schema";
 import { requirePartner, requirePermission } from "./lib/auth";
 import { AUDIT_ACTIONS, recordAudit } from "./lib/audit";
+import { compareDestinations } from "./lib/destinationOrder";
 import {
   loadPartner,
   marginSnapshot,
@@ -507,6 +508,7 @@ export const myCatalogue = query({
           visaProductId: product._id,
           destinationId: product.destinationId,
           destinationName: destination?.name ?? "—",
+          destinationCountryCode: destination?.countryCode ?? "",
           destinationSlug: product.destinationSlug,
           flagEmoji: destination?.flagEmoji ?? "",
           productName: product.name,
@@ -540,13 +542,21 @@ export const myCatalogue = query({
     return {
       rows: filtered.sort(
         (a, b) =>
-          a.destinationName.localeCompare(b.destinationName) ||
-          a.productName.localeCompare(b.productName),
+          compareDestinations(
+            {
+              countryCode: a.destinationCountryCode,
+              name: a.destinationName,
+            },
+            {
+              countryCode: b.destinationCountryCode,
+              name: b.destinationName,
+            },
+          ) || a.productName.localeCompare(b.productName),
       ),
       destinations: destinations
         .filter((d): d is Doc<"destinations"> => d !== null)
-        .map((d) => ({ _id: d._id, name: d.name, flagEmoji: d.flagEmoji }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort(compareDestinations)
+        .map((d) => ({ _id: d._id, name: d.name, flagEmoji: d.flagEmoji })),
       defaultMarkupPercent: partner.defaultMarkupPercent,
       truncated: products.length >= PRODUCT_LIMIT,
     };

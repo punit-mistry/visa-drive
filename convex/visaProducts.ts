@@ -10,6 +10,7 @@ import {
 import { entryType, paymentMode, visaCategory } from "./schema";
 import { authError, callerHasPermission, requirePermission } from "./lib/auth";
 import { AUDIT_ACTIONS, diffFields, recordAudit } from "./lib/audit";
+import { compareDestinations } from "./lib/destinationOrder";
 import { PERMISSIONS } from "../lib/constants/roles";
 
 /* ============================================================================
@@ -276,7 +277,7 @@ export const searchForDiscovery = query({
 
     results.sort(
       (a, b) =>
-        a.destination.displayOrder - b.destination.displayOrder ||
+        compareDestinations(a.destination, b.destination) ||
         a.displayOrder - b.displayOrder,
     );
 
@@ -364,7 +365,7 @@ export const listAll = query({
 
     return joined.sort(
       (a, b) =>
-        (a.destination?.displayOrder ?? 0) - (b.destination?.displayOrder ?? 0) ||
+        compareDestinations(a.destination ?? {}, b.destination ?? {}) ||
         a.displayOrder - b.displayOrder,
     );
   },

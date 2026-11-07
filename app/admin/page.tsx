@@ -155,7 +155,7 @@ export default function AdminDashboardPage() {
                   </Link>
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="max-h-72 overflow-y-auto scrollbar-thin">
                 {summary.applicationsOverTime.points.length === 0 ? (
                   <EmptyState
                     compact
@@ -187,7 +187,7 @@ export default function AdminDashboardPage() {
                   {summary.statusDistribution.total} applications
                 </span>
               </CardHeader>
-              <CardContent>
+              <CardContent className="max-h-72 overflow-y-auto scrollbar-thin">
                 {summary.statusDistribution.rows.length === 0 ? (
                   <EmptyState compact title="No applications yet" />
                 ) : (
@@ -223,7 +223,7 @@ export default function AdminDashboardPage() {
               }
             />
             <Card>
-              <CardContent className="divide-y divide-border p-0">
+              <CardContent className="max-h-96 divide-y divide-border overflow-y-auto p-0 scrollbar-thin">
                 {summary.recentBookings.length === 0 ? (
                   <EmptyState compact title="No bookings yet" />
                 ) : (
@@ -276,7 +276,7 @@ export default function AdminDashboardPage() {
                   {queue.counts.documentsAwaitingReview}
                 </span>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="max-h-80 space-y-2 overflow-y-auto scrollbar-thin">
                 {queue.documentsAwaitingReview.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Nothing waiting. All documents have been reviewed.
@@ -310,7 +310,7 @@ export default function AdminDashboardPage() {
                   {queue.counts.unassignedApplications}
                 </span>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="max-h-80 space-y-2 overflow-y-auto scrollbar-thin">
                 {queue.unassignedApplications.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Every open application has an owner.
@@ -348,7 +348,7 @@ export default function AdminDashboardPage() {
                   {queue.counts.leadsDueForFollowUp}
                 </span>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="max-h-80 space-y-2 overflow-y-auto scrollbar-thin">
                 {queue.leadsDueForFollowUp.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No follow-ups are due right now.
@@ -384,7 +384,7 @@ export default function AdminDashboardPage() {
                   {queue.counts.unansweredConversations}
                 </span>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="max-h-80 space-y-2 overflow-y-auto scrollbar-thin">
                 {queue.unansweredConversations.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No customer messages waiting for a reply.

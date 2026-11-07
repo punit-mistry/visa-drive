@@ -10,6 +10,7 @@ import type { ActionCtx, MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getAuthUser, requirePermission } from "./lib/auth";
 import { AUDIT_ACTIONS, recordAudit } from "./lib/audit";
+import { isLeadDestination } from "./lib/destinationOrder";
 import { generateReference } from "./lib/references";
 import { PERMISSIONS } from "../lib/constants/roles";
 import { DOCUMENT_TYPE_MAP, MAX_UPLOAD_BYTES } from "../lib/constants/documents";
@@ -153,7 +154,13 @@ async function seedCatalogue(
     faqsCreated: 0,
   };
 
-  for (const [dIndex, dest] of SEED_DESTINATIONS.entries()) {
+  // Persist the United States at displayOrder 0. The public queries sort it
+  // first regardless, but the stored order should not disagree with them.
+  const orderedDestinations = [...SEED_DESTINATIONS].sort(
+    (a, b) => Number(isLeadDestination(b)) - Number(isLeadDestination(a)),
+  );
+
+  for (const [dIndex, dest] of orderedDestinations.entries()) {
     const destinationId = await upsertDestination(ctx, dest, dIndex, now, counts);
 
     // FAQs have no natural key, so the scope is cleared and rewritten. This is

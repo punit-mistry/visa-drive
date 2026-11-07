@@ -178,98 +178,96 @@ export function DataTable<TData, TValue>({
         />
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="scrollbar-thin overflow-x-auto">
-            <Table>
-              <TableHeader
-                className={cn(stickyHeader && "sticky top-0 z-10 bg-surface")}
-              >
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                    {headerGroup.headers.map((header) => {
-                      const canSort = header.column.getCanSort();
-                      const sortDir = header.column.getIsSorted();
+          <Table containerClassName="scrollbar-thin max-h-[65vh] overflow-y-auto">
+            <TableHeader
+              className={cn(stickyHeader && "sticky top-0 z-10 bg-surface")}
+            >
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                  {headerGroup.headers.map((header) => {
+                    const canSort = header.column.getCanSort();
+                    const sortDir = header.column.getIsSorted();
 
-                      return (
-                        <TableHead
-                          key={header.id}
-                          style={{
-                            width:
-                              header.getSize() !== 150 ? header.getSize() : undefined,
-                          }}
-                          className="whitespace-nowrap text-xs font-medium text-muted-foreground"
-                        >
-                          {header.isPlaceholder ? null : canSort ? (
-                            <button
-                              type="button"
-                              onClick={header.column.getToggleSortingHandler()}
-                              className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-foreground focus-brand"
-                              aria-label={`Sort by ${
-                                typeof header.column.columnDef.header === "string"
-                                  ? header.column.columnDef.header
-                                  : header.column.id
-                              }`}
-                            >
-                              {flexRender(
-                                header.column.columnDef.header,
-                                header.getContext(),
-                              )}
-                              {sortDir === "asc" ? (
-                                <ArrowUp className="size-3" aria-hidden />
-                              ) : sortDir === "desc" ? (
-                                <ArrowDown className="size-3" aria-hidden />
-                              ) : (
-                                <ChevronsUpDown
-                                  className="size-3 opacity-40"
-                                  aria-hidden
-                                />
-                              )}
-                            </button>
-                          ) : (
-                            flexRender(
+                    return (
+                      <TableHead
+                        key={header.id}
+                        style={{
+                          width:
+                            header.getSize() !== 150 ? header.getSize() : undefined,
+                        }}
+                        className="whitespace-nowrap text-xs font-medium text-muted-foreground"
+                      >
+                        {header.isPlaceholder ? null : canSort ? (
+                          <button
+                            type="button"
+                            onClick={header.column.getToggleSortingHandler()}
+                            className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-foreground focus-brand"
+                            aria-label={`Sort by ${
+                              typeof header.column.columnDef.header === "string"
+                                ? header.column.columnDef.header
+                                : header.column.id
+                            }`}
+                          >
+                            {flexRender(
                               header.column.columnDef.header,
                               header.getContext(),
-                            )
-                          )}
-                        </TableHead>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
+                            )}
+                            {sortDir === "asc" ? (
+                              <ArrowUp className="size-3" aria-hidden />
+                            ) : sortDir === "desc" ? (
+                              <ArrowDown className="size-3" aria-hidden />
+                            ) : (
+                              <ChevronsUpDown
+                                className="size-3 opacity-40"
+                                aria-hidden
+                              />
+                            )}
+                          </button>
+                        ) : (
+                          flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )
+                        )}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
 
-              <TableBody>
-                {table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() ? "selected" : undefined}
-                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                    onKeyDown={
-                      onRowClick
-                        ? (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              onRowClick(row.original);
-                            }
+            <TableBody>
+              {table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() ? "selected" : undefined}
+                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onRowClick(row.original);
                           }
-                        : undefined
-                    }
-                    tabIndex={onRowClick ? 0 : undefined}
-                    role={onRowClick ? "button" : undefined}
-                    className={cn(
-                      onRowClick &&
-                        "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
-                    )}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="py-3 align-middle">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                        }
+                      : undefined
+                  }
+                  tabIndex={onRowClick ? 0 : undefined}
+                  role={onRowClick ? "button" : undefined}
+                  className={cn(
+                    onRowClick &&
+                      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
+                  )}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="py-3 align-middle">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 

@@ -13,6 +13,7 @@ import {
   requirePermission,
 } from "./lib/auth";
 import { AUDIT_ACTIONS, diffFields, recordAudit } from "./lib/audit";
+import { compareDestinations } from "./lib/destinationOrder";
 import { PERMISSIONS } from "../lib/constants/roles";
 import { startingPrice } from "../lib/helpers/pricing";
 
@@ -27,9 +28,6 @@ import { startingPrice } from "../lib/helpers/pricing";
 
 /** Hard cap on catalogue reads so a public query can never run unbounded. */
 const CATALOGUE_LIMIT = 200;
-
-/** The destination that leads every published list. See `listPublished`. */
-const LEAD_COUNTRY_CODE = "US";
 
 /* -------------------------------------------------------------------------- */
 /*                                   slugs                                    */
@@ -99,9 +97,9 @@ async function productsFor(
 /**
  * Public destination grid.
  *
- * Ordered by `displayOrder` straight off the `by_published_order` index, and
- * each card carries its own `productCount` / `startingPrice` so the marketing
- * page needs exactly one query.
+ * Read in `displayOrder` off the `by_published_order` index, then sorted with
+ * the United States first. Each card carries its own `productCount` /
+ * `startingPrice` so the marketing page needs exactly one query.
  */
 export const listPublished = query({
   args: { limit: v.optional(v.number()) },
@@ -126,12 +124,7 @@ export const listPublished = query({
       .order("asc")
       .take(CATALOGUE_LIMIT);
 
-    const leads = (d: (typeof all)[number]) =>
-      d.countryCode?.toUpperCase() === LEAD_COUNTRY_CODE;
-
-    const destinations = [...all]
-      .sort((a, b) => Number(leads(b)) - Number(leads(a)))
-      .slice(0, limit);
+    const destinations = [...all].sort(compareDestinations).slice(0, limit);
 
     const cards = [];
     // One indexed read per destination - never a scan across all products.
@@ -261,7 +254,7 @@ export const listAll = query({
       });
     }
 
-    return withCounts.sort((a, b) => a.displayOrder - b.displayOrder);
+    return withCounts.sort(compareDestinations);
   },
 });
 

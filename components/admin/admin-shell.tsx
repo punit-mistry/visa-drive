@@ -204,17 +204,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
             <div className="flex min-h-screen">
               {/* Desktop sidebar */}
-              <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:block">
-                <div className="sticky top-0 flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
+              <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
+                <div className="flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-5">
                   <Logo size="md" href="/admin" />
                   <span className="rounded-full bg-sidebar-accent px-2 py-0.5 text-[11px] font-medium text-sidebar-foreground">
                     Admin
                   </span>
                 </div>
-                <nav data-tour="admin-nav" className="scrollbar-thin max-h-[calc(100vh-4rem)] space-y-6 overflow-y-auto p-4">
+                <nav data-tour="admin-nav" className="scrollbar-thin min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
                   <AdminNav groups={navGroupsWithItems} pathname={pathname} dark />
                 </nav>
-                <div className="border-t border-sidebar-border p-4">
+                <div className="shrink-0 border-t border-sidebar-border p-4">
                   <div className="flex items-center gap-3">
                     <UserButton
                       appearance={{ elements: { avatarBox: "size-8" } }}

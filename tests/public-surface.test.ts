@@ -22,6 +22,46 @@ describe("the public catalogue", () => {
     ).toBeNull();
   });
 
+  test("the United States leads the grid even when it is ordered last", async () => {
+    const t = newTest();
+    const now = Date.now();
+
+    const usaId = await t.run(async (ctx) => {
+      await ctx.db.insert("destinations", {
+        slug: "uae",
+        name: "United Arab Emirates",
+        countryCode: "AE",
+        flagEmoji: "🇦🇪",
+        summary: "First in the admin's order, second on the page.",
+        currency: "INR",
+        highlights: [],
+        isPopular: true,
+        isPublished: true,
+        displayOrder: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      return await ctx.db.insert("destinations", {
+        slug: "usa",
+        name: "United States of America",
+        countryCode: "US",
+        flagEmoji: "🇺🇸",
+        summary: "Leads every list, whatever the display order says.",
+        currency: "INR",
+        highlights: [],
+        isPopular: true,
+        isPublished: true,
+        displayOrder: 99,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+
+    const published = await t.query(api.destinations.listPublished, {});
+    expect(published[0]?._id).toBe(usaId);
+  });
+
   test("an unpublished product is not discoverable", async () => {
     const t = newTest();
     const cat = await makeCatalogue(t, { published: false, slug: "secret" });

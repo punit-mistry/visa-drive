@@ -892,9 +892,9 @@ function PricingTab({
               }
             />
           ) : (
-            <div className="scrollbar-thin overflow-x-auto">
+            <div className="scrollbar-thin max-h-[65vh] overflow-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-border bg-surface">
+                <thead className="sticky top-0 z-10 border-b border-border bg-surface">
                   <tr className="text-left text-xs font-medium text-muted-foreground">
                     <th className="px-4 py-3">Destination</th>
                     <th className="px-4 py-3">Service</th>
