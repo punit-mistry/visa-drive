@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { CardGridSkeleton, EmptyState } from "@/components/shared/states";
 import { DemoContentBadge } from "@/components/shared/status-badge";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { formatProcessingTime, formatMoney } from "@/lib/helpers/pricing";
 import { titleCase } from "@/lib/helpers/format";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,9 @@ import { cn } from "@/lib/utils";
  * is stated once at the top, the catalogue filters by destination and
  * category without a page reload, and each card ends in the only action that
  * matters. Nothing here markets; the customer has already decided to apply.
+ *
+ * A customer arriving as `/apply?product=<id>` made that decision on a
+ * marketing page, so the catalogue is skipped entirely.
  */
 
 const HOW_IT_WORKS = [
@@ -56,15 +60,97 @@ const HOW_IT_WORKS = [
 ];
 
 export default function ApplyPage() {
+  // `useSearchParams` needs a suspense boundary. The fallback is the same
+  // hand-off panel the auto-start path shows, so an inbound ?product= link
+  // never flashes a catalogue the customer has already chosen from.
+  return (
+    <Suspense fallback={<StartingApplication />}>
+      <ApplyCatalogue />
+    </Suspense>
+  );
+}
+
+function ApplyCatalogue() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedProductId = searchParams.get("product");
+  const { isSignedIn } = useCurrentUser();
   const createDraft = useMutation(api.applications.createDraft);
   const discovery = useQuery(api.visaProducts.searchForDiscovery, { limit: 100 });
   const [search, setSearch] = useState("");
   const [destination, setDestination] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [startingId, setStartingId] = useState<string | null>(null);
+  const [autoStartFailed, setAutoStartFailed] = useState(false);
+  const autoStarted = useRef<string | null>(null);
 
   const rows = useMemo(() => discovery?.results ?? [], [discovery?.results]);
+
+  /**
+   * Arriving from a marketing page: `/apply?product=<id>`.
+   *
+   * The customer chose the service on the destination page and pressed "Start
+   * your application" there. Making them hunt for the same card again in the
+   * catalogue is a dead end, so the draft is created immediately and the
+   * wizard opens. `createDraft` reuses an open draft for the same product, so
+   * re-entering the link does not pile up empty applications.
+   */
+  useEffect(() => {
+    // Wait for the Convex profile — `createDraft` calls `requireUser`.
+    if (!requestedProductId || !isSignedIn) return;
+    // The ref is the only guard against a second call, and it has to be the
+    // only one: in development React mounts effects twice, so an
+    // `ignore`-the-result cleanup flag would discard the single attempt the
+    // ref allows and leave the page spinning forever.
+    if (autoStarted.current === requestedProductId) return;
+    autoStarted.current = requestedProductId;
+
+    let settled = false;
+
+    // Nothing should be able to strand the customer on a spinner — if the
+    // mutation neither resolves nor rejects, fall back to the catalogue.
+    const watchdog = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      setAutoStartFailed(true);
+      router.replace("/apply");
+      toast.error("That took too long. Please pick your service below.");
+    }, 15_000);
+
+    void (async () => {
+      try {
+        const result = await createDraft({
+          visaProductId: requestedProductId as Id<"visaProducts">,
+          travellerCount: 1,
+        });
+        if (settled) return;
+        settled = true;
+        clearTimeout(watchdog);
+        toast.success(
+          result.reused
+            ? "Resumed your saved draft."
+            : "Draft created. Let us complete your details.",
+        );
+        router.replace(`/apply/${result.applicationId}`);
+      } catch (error) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(watchdog);
+        // Withdrawn, unpublished or a mistyped id: drop the dead parameter
+        // and let the customer pick from the catalogue rather than leaving
+        // them on a spinner.
+        setAutoStartFailed(true);
+        router.replace("/apply");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "That visa service is not available. Please choose another.",
+        );
+      }
+    })();
+  }, [requestedProductId, isSignedIn, createDraft, router]);
+
+  const autoStarting = Boolean(requestedProductId) && !autoStartFailed;
 
   // Facets are derived from what the catalogue actually returned, so a filter
   // chip can never offer a destination with nothing behind it.
@@ -130,6 +216,15 @@ export default function ApplyPage() {
     } finally {
       setStartingId(null);
     }
+  }
+
+  if (autoStarting) {
+    const chosen = rows.find((item) => item._id === requestedProductId);
+    return (
+      <StartingApplication
+        name={chosen ? `${chosen.destination.name} · ${chosen.name}` : undefined}
+      />
+    );
   }
 
   return (
@@ -276,6 +371,26 @@ export default function ApplyPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The hand-off between "Start your application" and the wizard. */
+function StartingApplication({ name }: { name?: string }) {
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
+      <span className="flex size-12 items-center justify-center rounded-2xl border border-border bg-card">
+        <Loader2 className="size-5 animate-spin text-brand" aria-hidden />
+      </span>
+      <div className="space-y-1.5">
+        <p className="text-base font-semibold tracking-tight" role="status">
+          Starting your application
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {name ? `Preparing ${name}.` : "Preparing your draft."} This only takes a
+          moment.
+        </p>
+      </div>
     </div>
   );
 }

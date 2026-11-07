@@ -84,6 +84,13 @@ import { cn } from "@/lib/utils";
  * refresh never silently drops a filled-in step.
  */
 
+/**
+ * The largest party the wizard will take, matching the clamp in
+ * `applications.createDraft` and `applications.saveDraftStep`. Anything above
+ * this is a group booking, which goes through the team rather than the form.
+ */
+const MAX_TRAVELLERS = 20;
+
 const STEPS = [
   { id: 1, label: "Trip details", description: "Where and when you travel" },
   { id: 2, label: "Travellers", description: "Passport and contact details" },
@@ -374,6 +381,36 @@ function DraftWizard({
     }
   }
 
+  /**
+   * Change the party size from somewhere other than step 1.
+   *
+   * The travellers step needs this: someone who said "2" and then finds a
+   * fourth person is coming should not have to walk back a step to say so.
+   * It writes through `saveDraftStep`, which recomputes the price from the
+   * catalogue row — the count is a price input, so it can never be changed
+   * locally and left for the server to believe later.
+   */
+  async function setTravellerCount(next: number) {
+    const clamped = Math.max(1, Math.min(Math.floor(next), MAX_TRAVELLERS));
+    if (clamped === trip.travellerCount) return;
+
+    const previous = trip.travellerCount;
+    // Optimistic, so the price rail and the count move with the button rather
+    // than a round trip later; rolled back if the write fails.
+    setTrip((current) => ({ ...current, travellerCount: clamped }));
+    try {
+      await saveStep({ applicationId, patch: { travellerCount: clamped } });
+    } catch (error) {
+      setTrip((current) => ({ ...current, travellerCount: previous }));
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update the number of travellers.",
+      );
+      throw error;
+    }
+  }
+
   async function goToStep(nextStep: number) {
     // Moving away from step 1 must not lose what is in the buffer.
     if (step === 1 && tripDirty) {
@@ -500,6 +537,7 @@ function DraftWizard({
               busy={busy}
               onBack={() => goToStep(1)}
               onContinue={() => goToStep(3)}
+              onTravellerCountChange={setTravellerCount}
             />
           )}
 
@@ -731,7 +769,7 @@ function TripStep({
             <Field
               label="Number of travellers"
               required
-              hint="Add each traveller in the next step. The total updates with this count."
+              hint="Add each traveller in the next step, where you can also add one more. The total updates with this count."
             >
               <TravellerCounter
                 value={trip.travellerCount}
@@ -882,7 +920,8 @@ function TravellerCounter({
   onChange: (value: number) => void;
   id?: string;
 }) {
-  const clamp = (next: number) => Math.max(1, Math.min(20, next));
+  const clamp = (next: number) =>
+    Math.max(1, Math.min(MAX_TRAVELLERS, next));
 
   return (
     <div className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-card px-1.5 shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/20">
@@ -902,7 +941,7 @@ function TravellerCounter({
         id={id}
         type="number"
         min={1}
-        max={20}
+        max={MAX_TRAVELLERS}
         value={value}
         aria-label="Number of travellers"
         onChange={(event) => onChange(clamp(Number(event.target.value) || 1))}
@@ -913,7 +952,7 @@ function TravellerCounter({
         variant="ghost"
         size="icon-sm"
         aria-label="Add a traveller"
-        disabled={value >= 20}
+        disabled={value >= MAX_TRAVELLERS}
         onClick={() => onChange(clamp(value + 1))}
       >
         <span aria-hidden className="text-base leading-none">
@@ -1032,6 +1071,7 @@ function TravellersStep({
   busy,
   onBack,
   onContinue,
+  onTravellerCountChange,
 }: {
   applicationId: Id<"applications">;
   applicants: Doc<"applicants">[];
@@ -1040,6 +1080,7 @@ function TravellersStep({
   busy: boolean;
   onBack: () => void;
   onContinue: () => void;
+  onTravellerCountChange: (next: number) => Promise<void>;
 }) {
   const removeApplicant = useMutation(api.applicants.remove);
   const [adding, setAdding] = useState(applicants.length === 0);
@@ -1047,14 +1088,71 @@ function TravellersStep({
     applicants.length === 0 ? "new" : `applicant-${applicants[0]._id}`,
   );
   const [removing, setRemoving] = useState<Id<"applicants"> | null>(null);
+  const [resizing, setResizing] = useState(false);
+  /**
+   * Whether the open "new traveller" form is the reason the party grew.
+   *
+   * Pressing "Add another traveller" raises the count — and so the price —
+   * before the form is filled in. If that form is then cancelled, the raise
+   * has to come back off, or the customer is quoted for a traveller who was
+   * never entered.
+   */
+  const [raisedForAdd, setRaisedForAdd] = useState(false);
 
-  const canAdd = applicants.length < travellerCount;
+  /** Spare slots already paid for by the count declared on step 1. */
   const remaining = travellerCount - applicants.length;
+  const full = remaining <= 0;
+  const atCeiling = travellerCount >= MAX_TRAVELLERS && full;
+
+  /**
+   * Add a traveller, growing the party if it is already full.
+   *
+   * The count is no longer a ceiling the customer has to go back a step to
+   * raise. A family that booked for two and then brought the grandparents
+   * presses this twice; the price follows, because the count is written
+   * through the server, which reprices from the catalogue row.
+   */
+  async function handleAdd() {
+    let raised = false;
+    if (full) {
+      if (travellerCount >= MAX_TRAVELLERS) return;
+      setResizing(true);
+      try {
+        await onTravellerCountChange(travellerCount + 1);
+        raised = true;
+      } catch {
+        return; // The parent has already explained the failure.
+      } finally {
+        setResizing(false);
+      }
+    }
+    setRaisedForAdd(raised);
+    setAdding(true);
+    setOpen("new");
+  }
+
+  /** Close the new-traveller form, undoing the raise it was opened with. */
+  async function handleCancelAdd() {
+    setAdding(false);
+    if (!raisedForAdd) return;
+    setRaisedForAdd(false);
+    await onTravellerCountChange(travellerCount - 1).catch(() => {
+      // Already reported, and the count stays where the server has it.
+    });
+  }
 
   async function handleRemove(applicantId: Id<"applicants">) {
     setRemoving(applicantId);
     try {
       await removeApplicant({ applicationId, applicantId });
+      // If the list was the thing setting the party size, it keeps setting
+      // it — otherwise someone who added a fourth traveller by mistake would
+      // be billed for four until they walked back to step 1. A count the
+      // customer declared and has not yet filled is left alone: that is
+      // still what they told us.
+      if (full && travellerCount > 1) {
+        await onTravellerCountChange(applicants.length - 1);
+      }
       toast.success("Traveller removed.");
     } catch (error) {
       toast.error(
@@ -1093,7 +1191,7 @@ function TravellersStep({
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
               Add at least one traveller to continue. You can add the rest later.
             </p>
-            <Button className="mt-5" onClick={() => setAdding(true)}>
+            <Button className="mt-5" onClick={handleAdd} disabled={resizing}>
               <Plus className="size-4" aria-hidden />
               Add traveller
             </Button>
@@ -1203,9 +1301,13 @@ function TravellersStep({
                   <ApplicantForm
                     applicationId={applicationId}
                     requiredFields={requiredFields}
-                    onSaved={() => setAdding(false)}
+                    onSaved={() => {
+                      setAdding(false);
+                      // The raise is now backed by a real traveller.
+                      setRaisedForAdd(false);
+                    }}
                     footer={
-                      <Button type="button" variant="ghost" onClick={() => setAdding(false)}>
+                      <Button type="button" variant="ghost" onClick={handleCancelAdd}>
                         Cancel
                       </Button>
                     }
@@ -1216,21 +1318,33 @@ function TravellersStep({
           </Accordion>
         )}
 
-        {!adding && canAdd && applicants.length > 0 && (
+        {!adding && applicants.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setAdding(true);
-                setOpen("new");
-              }}
-            >
-              <Plus className="size-4" aria-hidden />
-              Add traveller
+            <Button variant="outline" onClick={handleAdd} disabled={resizing || atCeiling}>
+              {resizing ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Plus className="size-4" aria-hidden />
+              )}
+              Add another traveller
             </Button>
             <p className="text-xs text-muted-foreground">
-              {remaining} more {remaining === 1 ? "traveller" : "travellers"} to add
-              before you can submit.
+              {atCeiling ? (
+                <>
+                  {MAX_TRAVELLERS} travellers is the most this form takes — talk
+                  to our team for a larger group.
+                </>
+              ) : remaining > 0 ? (
+                <>
+                  {remaining} more {remaining === 1 ? "traveller" : "travellers"} to
+                  add before you can submit.
+                </>
+              ) : (
+                <>
+                  Everyone on this application is listed. Adding another updates
+                  the total.
+                </>
+              )}
             </p>
           </div>
         )}

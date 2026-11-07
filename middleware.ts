@@ -31,8 +31,13 @@ export default clerkMiddleware(async (auth, req) => {
     // Without an explicit URL, protect() answers a signed-out visitor with a
     // bare 404 — a dead end for anyone who clicked "Start application" while
     // logged out. Send them to sign-in and back to where they were going.
+    // The search string matters: /apply?product=<id> starts that application
+    // on arrival, and dropping the query would land them on a bare catalogue.
     const signIn = new URL("/sign-in", req.url);
-    signIn.searchParams.set("redirect_url", req.nextUrl.pathname);
+    signIn.searchParams.set(
+      "redirect_url",
+      req.nextUrl.pathname + req.nextUrl.search,
+    );
     await auth.protect({ unauthenticatedUrl: signIn.toString() });
     return NextResponse.next();
   }
@@ -42,7 +47,10 @@ export default clerkMiddleware(async (auth, req) => {
 
     if (!userId) {
       const signIn = new URL("/sign-in", req.url);
-      signIn.searchParams.set("redirect_url", req.nextUrl.pathname);
+      signIn.searchParams.set(
+        "redirect_url",
+        req.nextUrl.pathname + req.nextUrl.search,
+      );
       return NextResponse.redirect(signIn);
     }
 
@@ -68,10 +76,28 @@ export default clerkMiddleware(async (auth, req) => {
   return NextResponse.next();
 });
 
+/**
+ * Only the routes that have something to protect.
+ *
+ * This used to match every request, which meant Clerk ran on the public
+ * marketing pages too — and a Clerk development instance answers the first
+ * request from a new browser with a handshake redirect out to
+ * `*.clerk.accounts.dev` and back. That round trip was adding roughly a
+ * second to the first byte of a page that has nothing to authenticate.
+ *
+ * Anything not listed here never reaches Clerk, so `auth()` must not be
+ * called from those routes. The one API route that uses it, `/api/admin/staff`,
+ * is matched below; `/api/webhooks/*` verifies its own Svix signature and
+ * deliberately stays outside.
+ */
 export const config = {
   matcher: [
-    // Skip Next internals and static files unless they appear in search params
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    "/dashboard/:path*",
+    "/apply/:path*",
+    "/checkout/:path*",
+    "/admin/:path*",
+    "/sign-in/:path*",
+    "/sign-up/:path*",
+    "/api/admin/:path*",
   ],
 };

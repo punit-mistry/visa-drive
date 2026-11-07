@@ -10,7 +10,19 @@ export const metadata: Metadata = {
 
 export const instant = false;
 
-export default function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Keep the intended destination alive across the sign-in ↔ sign-up switch;
+  // see the note on the sign-in page.
+  const { redirect_url: redirectUrl } = await searchParams;
+  const signInHref =
+    typeof redirectUrl === "string" && redirectUrl.startsWith("/")
+      ? `/sign-in?redirect_url=${encodeURIComponent(redirectUrl)}`
+      : "/sign-in";
+
   return (
     <div>
       <div className="mb-7">
@@ -37,7 +49,7 @@ export default function SignUpPage() {
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
         <Link
-          href="/sign-in"
+          href={signInHref}
           className="font-medium text-foreground underline-offset-4 hover:underline"
         >
           Sign in

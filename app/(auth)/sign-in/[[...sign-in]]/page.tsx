@@ -9,7 +9,21 @@ export const metadata: Metadata = {
 
 export const instant = false;
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // The middleware parks the intended destination here — often
+  // /apply?product=<id>, which starts that application on arrival. Carry it
+  // over to sign-up too, so someone without an account does not lose their
+  // place by taking the only other door on this page.
+  const { redirect_url: redirectUrl } = await searchParams;
+  const signUpHref =
+    typeof redirectUrl === "string" && redirectUrl.startsWith("/")
+      ? `/sign-up?redirect_url=${encodeURIComponent(redirectUrl)}`
+      : "/sign-up";
+
   return (
     <div>
       <div className="mb-7">
@@ -34,7 +48,7 @@ export default function SignInPage() {
       <p className="mt-6 text-center text-sm text-muted-foreground">
         New to VisaDrive?{" "}
         <Link
-          href="/sign-up"
+          href={signUpHref}
           className="font-medium text-foreground underline-offset-4 hover:underline"
         >
           Create an account
