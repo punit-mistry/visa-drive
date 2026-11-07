@@ -12,7 +12,6 @@ import {
   FileText,
   LayoutDashboard,
   Menu,
-  MessageSquare,
   Settings,
   ShieldCheck,
   Users,
@@ -49,7 +48,14 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/applications", label: "Applications", icon: FileText, permission: PERMISSIONS.APPLICATION_VIEW_ALL },
       { href: "/admin/enquiries", label: "Enquiries", icon: ClipboardList, permission: PERMISSIONS.ENQUIRY_VIEW },
-      { href: "/admin/conversations", label: "Conversations", icon: MessageSquare, permission: PERMISSIONS.CONVERSATION_VIEW_ALL },
+      // Conversations is hidden from the menu for now, at the client's
+      // request. Nothing else is switched off: the route, its permission
+      // (CONVERSATION_VIEW_ALL) and the notification deep links into
+      // /admin/conversations/<id> all still work, so an email or in-app
+      // notification about a customer message still opens the thread. Put
+      // the line back — and the MessageSquare import with it — to restore
+      // the menu entry.
+      // { href: "/admin/conversations", label: "Conversations", icon: MessageSquare, permission: PERMISSIONS.CONVERSATION_VIEW_ALL },
       { href: "/admin/payments", label: "Payments", icon: CreditCard, permission: PERMISSIONS.PAYMENT_VIEW },
     ],
   },
