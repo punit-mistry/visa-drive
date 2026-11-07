@@ -207,6 +207,38 @@ export const VALUE_PROPS = [
 ] as const;
 
 /* -------------------------------------------------------------------------- */
+/*                                 Who we are                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The "who we are" block on the homepage.
+ *
+ * The client supplied this copy. Two superlatives in their draft — "the
+ * fastest possible U.S. visa appointments" and "the most competitive rates" —
+ * are deliberately not printed: this project does not make timeline or price
+ * claims it cannot source, which is the same rule that already governs
+ * `VALUE_PROPS`. The sentence keeps their meaning and names the work we
+ * actually do instead. If the client confirms both claims, they can go back.
+ *
+ * `yearsOfExperience` is the client's own figure, carried over from their
+ * current site and listed in NEEDS_VERIFICATION. It is on screen now, so it
+ * is the one number here that has to be right.
+ */
+export const WHO_WE_ARE = {
+  eyebrow: "Who we are",
+  title: "Where opportunity meets expertise.",
+  body: "We believe every plan deserves a fair chance, and that paperwork should never be the reason one stalls. We handle U.S. visa appointments and the documentation around them — from the DS-160 to interview day — with our fees stated before you commit. Our job is to simplify the journey and get you one step closer to your goal.",
+  /** U.S. non-immigrant categories we prepare and support applications for. */
+  visaTypes: [
+    "Business & tourism visa",
+    "Student visa",
+    "Exchange visitor programme visa",
+    "Temporary work visa",
+  ],
+  yearsOfExperience: 10,
+} as const;
+
+/* -------------------------------------------------------------------------- */
 /*                                 Navigation                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -256,7 +288,7 @@ export const NEEDS_VERIFICATION = [
   {
     item: "Years of experience",
     detail:
-      'The current hero claims "over 10+ years of experience in the travel industry". Carried over but should be confirmed.',
+      'The current site claims "over 10+ years of experience in the travel industry". It is now displayed on the homepage in the "Who we are" section (WHO_WE_ARE.yearsOfExperience). Confirm the figure or tell us to drop it.',
   },
   {
     item: "30-day appointment claim",
