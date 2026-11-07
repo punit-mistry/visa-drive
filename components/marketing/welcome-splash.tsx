@@ -10,10 +10,14 @@ import { Logo } from "@/components/shared/logo";
  * Three rules it has to obey, because a splash screen is the easiest thing in
  * a product to get wrong:
  *
- * 1. **It must never trap anyone.** The page renders behind it and the CSS
- *    itself fades it out on a timer with `forwards`, so even with JavaScript
- *    broken or still downloading the site becomes usable on its own. The
- *    script only ever makes it leave *sooner*.
+ * 1. **It must never trap anyone, or hold the page back.** The CSS fades it
+ *    out on its own 300ms timer with `forwards`, so it leaves whether or not
+ *    JavaScript ever arrives — and, just as importantly, without waiting for
+ *    hydration. That wait was the whole problem: while this sheet is over the
+ *    hero, the hero photograph is not counted as painted, so a splash that
+ *    left only once React had booted was adding about 1.4s to the page's
+ *    largest contentful paint. The script now only records that the visitor
+ *    has been welcomed; it no longer decides when.
  * 2. **It must not repeat.** Once per browsing session, not once per page
  *    view. The flag is read by a blocking script in `<head>` (see
  *    `SPLASH_GUARD`) so a returning navigation never flashes it before React
@@ -26,10 +30,16 @@ import { Logo } from "@/components/shared/logo";
  * someone, not to make them wait for an animation they asked not to see.
  */
 
-/** Minimum time on screen, so a fast load does not produce a flicker. */
-const MIN_MS = 750;
-/** Hard ceiling. The CSS backstop fires shortly after this. */
-const MAX_MS = 2400;
+/**
+ * Minimum time on screen, so a fast load does not produce a flicker.
+ *
+ * It matches the 300ms delay on `.vd-splash` in `globals.css`, which is what
+ * actually times the exit. This only stops the script from cutting the
+ * animation short on a page that hydrates unusually fast.
+ */
+const MIN_MS = 300;
+/** Hard ceiling, should hydration arrive very late. */
+const MAX_MS = 1600;
 
 const STORAGE_KEY = "vd:welcomed";
 

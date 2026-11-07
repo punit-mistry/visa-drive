@@ -83,27 +83,26 @@ export function Hero() {
    */
   const mediaY = useTransform(scrollYProgress, [0, 1], ["0%", "14%"]);
 
-  // One shared curve for every entrance, so the hero resolves as a single
-  // movement rather than five independent animations.
-  const ease = [0.22, 1, 0.36, 1] as const;
-
   /**
-   * `step` is the element's place in the cascade, not a delay in seconds.
+   * The hero's entrance, as a CSS cascade rather than a JavaScript one.
    *
-   * The whole sequence has to finish inside the welcome splash's minimum
-   * 750ms, or the splash lifts part-way through and you catch the hero
-   * mid-flight — which looks like the page stuttering rather than arriving.
-   * Six elements at 60ms apart plus a 0.55s travel lands at ~0.85s, and the
-   * last two are below the fold anyway.
+   * These elements are the first thing anyone sees, so their animation must
+   * not wait for React. A `motion` entrance renders the markup at
+   * `opacity: 0` and cannot begin until the bundle has downloaded, parsed and
+   * hydrated — which is exactly what made the hero photograph take a second
+   * longest-contentful-paint longer than the picture itself needed. The CSS
+   * in `[data-rise]` starts on the first painted frame instead, and reduced
+   * motion is handled by a media query rather than a hook, so it is correct
+   * before hydration too.
+   *
+   * `step` is the element's place in the cascade, not a delay in seconds. The
+   * whole sequence has to finish inside the welcome splash's minimum 750ms,
+   * or the splash lifts part-way through and you catch the hero mid-flight.
    */
-  const rise = (step: number) =>
-    reduceMotion
-      ? {}
-      : {
-          initial: { opacity: 0, y: 18 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.55, delay: step * 0.06, ease },
-        };
+  const rise = (step: number) => ({
+    "data-rise": "",
+    style: { animationDelay: step * 60 + "ms" } as React.CSSProperties,
+  });
 
   return (
     <section
@@ -126,15 +125,12 @@ export function Hero() {
       */}
       <motion.div
         aria-hidden
-        className="absolute inset-0 scale-110 transform-gpu"
+        className="vd-hero-backdrop absolute inset-0 scale-110 transform-gpu"
         style={
           reduceMotion
             ? undefined
             : { y: mediaY, willChange: "transform", backfaceVisibility: "hidden" }
         }
-        initial={reduceMotion ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.1, ease }}
       >
         <Image
           src={HERO_IMAGE}
@@ -162,45 +158,45 @@ export function Hero() {
 
       <div className="container-wide relative z-10 pb-10 lg:pb-14">
         {/* ------------------------------ masthead -------------------------- */}
-        <motion.p
+        <p
           {...rise(0)}
           className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/55 sm:text-[11px]"
         >
           <span>Visa applications</span>
           <span aria-hidden className="h-px w-6 bg-white/25" />
           <span>Khar West · Mumbai</span>
-        </motion.p>
+        </p>
 
-        <motion.h1
+        <h1
           {...rise(1)}
           className="display-hero mt-5 max-w-[16ch] text-paper"
         >
           Apply for your visa.
           <br />
           <span className="text-brand">We handle the rest.</span>
-        </motion.h1>
+        </h1>
 
-        <motion.p
+        <p
           {...rise(2)}
           className="mt-5 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg"
         >
           {SITE.heroSubline}
-        </motion.p>
+        </p>
 
         {/* ------------------------------- search --------------------------- */}
         {/* The point of the whole frame. A visitor who knows where they are
             going can start from here without reading another word. */}
-        <motion.div {...rise(3)} className="mt-8">
+        <div {...rise(3)} className="mt-8">
           <VisaDiscoveryForm />
-        </motion.div>
+        </div>
 
         {/* --------------------------- destinations ------------------------- */}
-        <motion.div {...rise(4)} className="mt-7">
+        <div {...rise(4)} className="mt-7">
           <DestinationStrip destinations={destinations} />
-        </motion.div>
+        </div>
 
         {/* ---------------------------- assurances -------------------------- */}
-        <motion.ul
+        <ul
           {...rise(5)}
           className="mt-8 flex flex-col gap-2.5 border-t border-white/12 pt-6 sm:flex-row sm:flex-wrap sm:gap-x-8 sm:gap-y-3"
         >
@@ -216,7 +212,7 @@ export function Hero() {
               </li>
             );
           })}
-        </motion.ul>
+        </ul>
       </div>
     </section>
   );

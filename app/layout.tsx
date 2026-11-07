@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Manrope } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
 
-import { ConvexClientProvider } from "@/components/providers/convex-client-provider";
+import { FlightTransition } from "@/components/marketing/flight-transition";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { SetupRequired } from "@/components/shared/setup-required";
 import { Toaster } from "@/components/ui/sonner";
 import { SITE } from "@/lib/constants/site";
 
@@ -76,54 +74,18 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
+/**
+ * The root layout carries the document, the fonts, the theme and the page
+ * transition — and no authentication.
+ *
+ * Clerk and the authenticated Convex client are mounted per surface instead
+ * (see `AuthenticatedProviders`), because mounting them here meant every
+ * visitor to the public site downloaded and ran an authentication SDK to
+ * read a page about tourist visas.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const body = clerkPublishableKey ? (
-    <ClerkProvider
-      publishableKey={clerkPublishableKey}
-      appearance={{
-        variables: {
-          // Clerk's own token names, kept in step with the palette in
-          // globals.css so its hosted forms are indistinguishable from ours.
-          colorPrimary: "#c62222",
-          colorForeground: "#17141a",
-          colorMutedForeground: "#716d78",
-          colorBorder: "#e7e5ea",
-          colorDanger: "#b42318",
-          colorSuccess: "#0e9f6e",
-          colorWarning: "#d97706",
-          borderRadius: "0.625rem",
-          fontFamily: "var(--font-manrope)",
-        },
-        elements: {
-          formButtonPrimary:
-            "bg-primary hover:bg-brand-deep text-primary-foreground shadow-none",
-          card: "shadow-none border border-border",
-        },
-      }}
-    >
-      <ConvexClientProvider>{children}</ConvexClientProvider>
-    </ClerkProvider>
-  ) : (
-    <SetupRequired
-      title="Clerk is not configured"
-      missing={[
-        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
-        "CLERK_SECRET_KEY",
-      ]}
-      steps={[
-        "Create a free application at dashboard.clerk.com.",
-        "Copy the publishable and secret keys into .env.local.",
-        "Add a JWT template named `convex` with claims for email, name and picture (see README).",
-        "Run: npx convex env set CLERK_JWT_ISSUER_DOMAIN <issuer-url>",
-        "Restart `npm run dev`.",
-      ]}
-    />
-  );
-
   return (
     <html
       lang="en"
@@ -137,7 +99,11 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          {body}
+          {children}
+          {/* Mounted at the root, not in the marketing layout: it has to
+              outlive the navigation it is animating. It installs nothing
+              while the visitor is inside the portal or the CRM. */}
+          <FlightTransition />
           <Toaster
             position="top-right"
             richColors

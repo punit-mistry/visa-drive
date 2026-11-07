@@ -155,7 +155,7 @@ export function PhoneField({
         aria-invalid={invalid}
         value={rest}
         onChange={(event) => compose(dial, event.target.value)}
-        className="min-w-0 flex-1 rounded-r-lg bg-transparent px-3 text-base outline-none placeholder:text-[#98a2b3] md:text-sm"
+        className="min-w-0 flex-1 rounded-r-lg bg-transparent px-3 text-base outline-none placeholder:text-muted-foreground md:text-sm"
       />
     </div>
   );

@@ -87,7 +87,7 @@ export function TrustSection() {
             <span className="size-1.5 rounded-full bg-brand" aria-hidden />
             {SITE.name}
           </p>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">
             What to walk away from
           </p>
         </div>
@@ -103,7 +103,7 @@ export function TrustSection() {
                   className="pointer-events-none absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-brand transition-transform duration-500 ease-out group-focus-within:scale-x-100 group-hover:scale-x-100"
                 />
 
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35 transition-colors duration-500 group-hover:text-brand">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60 transition-colors duration-500 group-hover:text-brand">
                   {row.label}
                 </p>
 
@@ -117,7 +117,7 @@ export function TrustSection() {
                   {row.ours}
                 </p>
 
-                <p className="flex items-center gap-3 text-lg text-white/35 sm:text-xl">
+                <p className="flex items-center gap-3 text-lg text-white/60 sm:text-xl">
                   <span
                     className="flex size-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/40"
                     aria-hidden

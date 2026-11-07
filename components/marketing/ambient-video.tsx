@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
  *
  * It layers over a still that the caller has already rendered, and it only
  * ever adds to it: the still is the real content and the video is the
- * flourish. It declines to load at all when the visitor has asked for
- * reduced motion or is on a metered or slow connection, and `onError` puts
+ * flourish. It declines to load at all on a phone, or when the visitor has
+ * asked for reduced motion or is on a metered or slow connection, and `onError` puts
  * it back to the still if the file is missing or will not decode. There is
  * no broken state to design for, which is what makes it safe to use on a
  * hero.
@@ -21,13 +21,11 @@ import { cn } from "@/lib/utils";
  */
 export function AmbientVideo({
   src,
-  poster,
   className,
   /** Hold the video back until the still has had a moment to paint. */
   delayMs = 400,
 }: {
   src: string;
-  poster?: string;
   className?: string;
   delayMs?: number;
 }) {
@@ -37,6 +35,12 @@ export function AmbientVideo({
 
   useEffect(() => {
     if (reduceMotion) return;
+
+    // Phones never get it. Most of VisaDrive's customers are on a handset on
+    // mobile data, and a multi-megabyte decorative loop behind a gradient is
+    // not something to spend their data or their battery on. The still that
+    // the caller rendered underneath is the whole picture on small screens.
+    if (!window.matchMedia("(min-width: 1024px)").matches) return;
 
     // Respect Data Saver and obviously slow connections: a decorative loop is
     // not worth someone's mobile data.
@@ -62,7 +66,8 @@ export function AmbientVideo({
   return (
     <video
       src={src}
-      poster={poster}
+      // No `poster`: the caller's <Image> is already painted underneath, and
+      // a poster would fetch the same photograph a second time, unoptimised.
       autoPlay
       muted
       loop

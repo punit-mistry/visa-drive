@@ -140,7 +140,10 @@ function FloatingWhatsApp({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2.5 rounded-full bg-[#25D366] py-3 pl-3.5 pr-5 font-medium text-white elev-lg transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/50 focus-visible:ring-offset-2"
+        // Ink on the brand green, not white: white on #25D366 is 1.98:1 and
+        // fails WCAG AA outright, while the same green under near-black type
+        // reads at 10.6:1 and keeps the colour everyone recognises.
+        className="flex items-center gap-2.5 rounded-full bg-[#25D366] py-3 pl-3.5 pr-5 font-medium text-ink-black elev-lg transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/50 focus-visible:ring-offset-2"
       >
         <WhatsAppGlyph className="size-5" />
         <span className="text-sm">{label}</span>

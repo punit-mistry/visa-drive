@@ -126,7 +126,7 @@ export function CountrySelect({
                 <span className="truncate">{freeText}</span>
               </>
             ) : (
-              <span className="text-[#98a2b3]">{placeholder}</span>
+              <span className="text-muted-foreground">{placeholder}</span>
             )}
           </span>
           <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />

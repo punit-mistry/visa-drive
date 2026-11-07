@@ -52,7 +52,7 @@ export function FinalCta({
           quality={70}
           className="object-cover object-center"
         />
-        <AmbientVideo src={CTA_VIDEO} poster={CTA_IMAGE} />
+        <AmbientVideo src={CTA_VIDEO} />
       </div>
       <div
         aria-hidden

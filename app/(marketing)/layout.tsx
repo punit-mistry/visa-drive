@@ -3,8 +3,13 @@ import { Suspense } from "react";
 
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
-import { SPLASH_GUARD, WelcomeSplash } from "@/components/marketing/welcome-splash";
+import {
+  SPLASH_GUARD,
+  WelcomeSplash,
+} from "@/components/marketing/welcome-splash";
+import { ConvexPublicProvider } from "@/components/providers/convex-client-provider";
 import { SmoothScroll } from "@/components/providers/smooth-scroll";
+import { ScrollToTop } from "@/components/shared/scroll-to-top";
 import { WhatsAppButton } from "@/components/shared/whatsapp-button";
 
 /**
@@ -15,31 +20,30 @@ import { WhatsAppButton } from "@/components/shared/whatsapp-button";
  * applies to the pages people read and not to the portal wizard or the CRM
  * tables, where an eased scroll gets in the way of working.
  */
-export default function MarketingLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      {/* Blocking on purpose and tiny: it has to mark the document before the
+    <ConvexPublicProvider>
+      <div className="flex min-h-screen flex-col bg-background">
+        {/* Blocking on purpose and tiny: it has to mark the document before the
           first paint, or a second page flashes the splash it already saw. */}
-      <script dangerouslySetInnerHTML={{ __html: SPLASH_GUARD }} />
-      <WelcomeSplash />
-      {/* Reads the current pathname for active-link state, which is runtime
+        <script dangerouslySetInnerHTML={{ __html: SPLASH_GUARD }} />
+        <WelcomeSplash />
+        {/* Reads the current pathname for active-link state, which is runtime
           URL data, so both are suspended to let the rest of the page
           prerender while they stream in. */}
-      <Suspense fallback={null}>
-        <SmoothScroll />
-      </Suspense>
-      <Suspense fallback={<div className="h-20 border-b border-border" />}>
-        <SiteHeader />
-      </Suspense>
-      <main id="main" className="flex-1">
-        {children}
-      </main>
-      <SiteFooter />
-      <WhatsAppButton />
-    </div>
+        <Suspense fallback={null}>
+          <SmoothScroll />
+        </Suspense>
+        <Suspense fallback={<div className="h-20 border-b border-border" />}>
+          <SiteHeader />
+        </Suspense>
+        <main id="main" className="flex-1">
+          {children}
+        </main>
+        <SiteFooter />
+        <ScrollToTop />
+        <WhatsAppButton />
+      </div>
+    </ConvexPublicProvider>
   );
 }

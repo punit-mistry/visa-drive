@@ -76,7 +76,7 @@ export function SiteFooter() {
             <nav aria-labelledby="footer-destinations">
               <h2
                 id="footer-destinations"
-                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40"
+                className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55"
               >
                 Destinations
               </h2>
@@ -117,15 +117,15 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-14 space-y-3 border-t border-white/12 pt-8">
-          <p className="max-w-3xl text-xs leading-relaxed text-white/40">
+          <p className="max-w-3xl text-xs leading-relaxed text-white/55">
             {LEGAL.notAffiliated}
           </p>
-          <p className="max-w-3xl text-xs leading-relaxed text-white/40">
+          <p className="max-w-3xl text-xs leading-relaxed text-white/55">
             {LEGAL.noGuarantee}
           </p>
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-8 flex flex-col gap-3 text-xs text-white/55 sm:flex-row sm:items-center sm:justify-between">
           <p>
             © {year ? `${year} ` : ""}
             {settings.companyName}. All rights reserved.
@@ -147,7 +147,7 @@ function FooterColumn({
   const id = `footer-${title.toLowerCase()}`;
   return (
     <nav aria-labelledby={id}>
-      <h2 id={id} className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
+      <h2 id={id} className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
         {title}
       </h2>
       <ul className="mt-4 space-y-3 text-sm">

@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Show, UserButton } from "@clerk/nextjs";
-import { Menu, Phone, ShieldCheck } from "lucide-react";
+import { Menu, Phone, UserRound } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { Logo } from "@/components/shared/logo";
@@ -18,7 +17,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useClerkSession } from "@/hooks/use-clerk-session";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { MARKETING_NAV } from "@/lib/constants/site";
@@ -40,11 +39,25 @@ export function SiteHeader() {
   const settings = useSiteSettings();
   // Staff browsing the public site should be one click from the CRM rather
   // than having to type /admin. Customers never see this.
-  const { isStaff } = useCurrentUser();
+  /**
+   * Signed-in state from the Clerk cookie, not from clerk-js.
+   *
+   * The public site does not load Clerk at all any more, so the header
+   * answers the only question it needs — which pair of buttons to show —
+   * from `__client_uat`. Until the first effect runs this is `null`, which
+   * renders as signed out: that is also what a crawler and the prerendered
+   * HTML get, and it is the honest default.
+   *
+   * The admin shortcut is gone from the public header along with it. The
+   * cookie carries no role, and staff reach the CRM from the portal, which
+   * is one click away and does know who they are.
+   */
+  const signedIn = useClerkSession();
   const [scrolled, setScrolled] = useState(false);
-  const [drawer, setDrawer] = useState<{ pathname: string; open: boolean } | null>(
-    null,
-  );
+  const [drawer, setDrawer] = useState<{
+    pathname: string;
+    open: boolean;
+  } | null>(null);
 
   const hasCinematicHero = pathname === "/";
 
@@ -102,7 +115,11 @@ export function SiteHeader() {
   return (
     <>
       <motion.header
-        animate={{ paddingLeft: gutter, paddingRight: gutter, paddingTop: gutter }}
+        animate={{
+          paddingLeft: gutter,
+          paddingRight: gutter,
+          paddingTop: gutter,
+        }}
         transition={spring}
         className={cn(
           "inset-x-0 top-0 z-50",
@@ -154,203 +171,200 @@ export function SiteHeader() {
             aria-hidden
             className={cn(
               "pointer-events-none absolute inset-x-0 -bottom-px h-px transition-opacity duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-              onDark ? "bg-transparent" : hasCinematicHero ? "bg-white/12" : "bg-border",
+              onDark
+                ? "bg-transparent"
+                : hasCinematicHero
+                  ? "bg-white/12"
+                  : "bg-border",
               scrolled ? "opacity-0" : "opacity-100",
             )}
           />
-        <div className="flex items-center gap-10">
-          <Logo size="md" onDark={hasCinematicHero} />
+          <div className="flex items-center gap-10">
+            <Logo size="md" onDark={hasCinematicHero} />
 
-          <nav aria-label="Main" className="hidden lg:block">
-            <ul className="flex items-center gap-1">
-              {MARKETING_NAV.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={isActive(item.href) ? "page" : undefined}
-                    className={cn(
-                      "rounded-md px-3 py-2 text-[13px] font-medium tracking-wide transition-colors focus-brand",
-                      hasCinematicHero
-                        ? isActive(item.href)
-                          ? "text-white"
-                          : "text-white/60 hover:text-white"
-                        : isActive(item.href)
-                          ? "text-foreground"
-                          : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {item.label}
+            <nav aria-label="Main" className="hidden lg:block">
+              <ul className="flex items-center gap-1">
+                {MARKETING_NAV.map((item) => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={isActive(item.href) ? "page" : undefined}
+                      className={cn(
+                        "rounded-md px-3 py-2 text-[13px] font-medium tracking-wide transition-colors focus-brand",
+                        hasCinematicHero
+                          ? isActive(item.href)
+                            ? "text-white"
+                            : "text-white/60 hover:text-white"
+                          : isActive(item.href)
+                            ? "text-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <a
+              href={`tel:+${phoneDigits(settings.phone)}`}
+              className={cn(
+                "hidden items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition-colors focus-brand xl:inline-flex",
+                hasCinematicHero
+                  ? "text-white/60 hover:text-white"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Phone className="size-4" aria-hidden />
+              {settings.phoneDisplay}
+            </a>
+
+            {signedIn ? (
+              <>
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    "hidden sm:inline-flex",
+                    hasCinematicHero &&
+                      "border-white/30 bg-white/5 text-white hover:border-white/50 hover:bg-white/10 hover:text-white dark:border-white/30 dark:bg-white/5",
+                  )}
+                >
+                  <Link href="/dashboard">My dashboard</Link>
+                </Button>
+                <Button
+                  asChild
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Your account"
+                  className={cn(
+                    hasCinematicHero &&
+                      "text-white/80 hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
+                  )}
+                >
+                  <Link href="/dashboard/profile">
+                    <UserRound className="size-5" aria-hidden />
                   </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <a
-            href={`tel:+${phoneDigits(settings.phone)}`}
-            className={cn(
-              "hidden items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition-colors focus-brand xl:inline-flex",
-              hasCinematicHero
-                ? "text-white/60 hover:text-white"
-                : "text-muted-foreground hover:text-foreground",
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "hidden sm:inline-flex",
+                    hasCinematicHero &&
+                      "text-white/70 hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
+                  )}
+                >
+                  <Link href="/sign-in">Sign in</Link>
+                </Button>
+                <Button asChild size="sm" className="font-semibold">
+                  <Link href="/destinations">Start your journey</Link>
+                </Button>
+              </>
             )}
-          >
-            <Phone className="size-4" aria-hidden />
-            {settings.phoneDisplay}
-          </a>
 
-          <Show when="signed-out">
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "hidden sm:inline-flex",
-                hasCinematicHero &&
-                  "text-white/70 hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
-              )}
+            <Sheet
+              open={mobileOpen}
+              onOpenChange={(open) => setDrawer({ pathname, open })}
             >
-              <Link href="/sign-in">Sign in</Link>
-            </Button>
-            <Button asChild size="sm" className="font-semibold">
-              <Link href="/destinations">Start your journey</Link>
-            </Button>
-          </Show>
-
-          <Show when="signed-in">
-            {isStaff && (
-              <Button
-                asChild
-                size="sm"
-                variant="ghost"
-                className={cn(
-                  "hidden sm:inline-flex",
-                  hasCinematicHero &&
-                    "text-white/80 hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
-                )}
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "lg:hidden",
+                    hasCinematicHero &&
+                      "text-white hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
+                  )}
+                  aria-label="Open menu"
+                >
+                  <Menu className="size-5" aria-hidden />
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                className="w-[min(22rem,88vw)] gap-0 p-0"
               >
-                <Link href="/admin">
-                  <ShieldCheck className="size-4" aria-hidden />
-                  Admin
-                </Link>
-              </Button>
-            )}
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className={cn(
-                "hidden sm:inline-flex",
-                hasCinematicHero &&
-                  "border-white/30 bg-white/5 text-white hover:border-white/50 hover:bg-white/10 hover:text-white dark:border-white/30 dark:bg-white/5",
-              )}
-            >
-              <Link href="/dashboard">My dashboard</Link>
-            </Button>
-            <UserButton
-              appearance={{ elements: { avatarBox: "size-8" } }}
-              userProfileUrl="/dashboard/profile"
-            />
-          </Show>
+                <SheetHeader className="border-b border-border">
+                  <SheetTitle asChild>
+                    <span>
+                      <Logo size="md" asLink={false} />
+                    </span>
+                  </SheetTitle>
+                  <SheetDescription className="sr-only">
+                    Site navigation
+                  </SheetDescription>
+                </SheetHeader>
 
-          <Sheet
-            open={mobileOpen}
-            onOpenChange={(open) => setDrawer({ pathname, open })}
-          >
-            <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "lg:hidden",
-                  hasCinematicHero &&
-                    "text-white hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
-                )}
-                aria-label="Open menu"
-              >
-                <Menu className="size-5" aria-hidden />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[min(22rem,88vw)] gap-0 p-0">
-              <SheetHeader className="border-b border-border">
-                <SheetTitle asChild>
-                  <span>
-                    <Logo size="md" asLink={false} />
-                  </span>
-                </SheetTitle>
-                <SheetDescription className="sr-only">
-                  Site navigation
-                </SheetDescription>
-              </SheetHeader>
+                <nav
+                  aria-label="Mobile"
+                  className="flex-1 overflow-y-auto px-4 py-2"
+                >
+                  <ul className="flex flex-col">
+                    {MARKETING_NAV.map((item) => (
+                      <li key={item.href}>
+                        <SheetClose asChild>
+                          <Link
+                            href={item.href}
+                            aria-current={
+                              isActive(item.href) ? "page" : undefined
+                            }
+                            className={cn(
+                              "flex items-center justify-between rounded-lg px-3 py-3 text-base font-medium transition-colors focus-brand",
+                              isActive(item.href)
+                                ? "bg-surface text-foreground"
+                                : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                            )}
+                          >
+                            {item.label}
+                          </Link>
+                        </SheetClose>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
 
-              <nav aria-label="Mobile" className="flex-1 overflow-y-auto px-4 py-2">
-                <ul className="flex flex-col">
-                  {MARKETING_NAV.map((item) => (
-                    <li key={item.href}>
-                      <SheetClose asChild>
-                        <Link
-                          href={item.href}
-                          aria-current={isActive(item.href) ? "page" : undefined}
-                          className={cn(
-                            "flex items-center justify-between rounded-lg px-3 py-3 text-base font-medium transition-colors focus-brand",
-                            isActive(item.href)
-                              ? "bg-surface text-foreground"
-                              : "text-muted-foreground hover:bg-surface hover:text-foreground",
-                          )}
-                        >
-                          {item.label}
-                        </Link>
-                      </SheetClose>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-
-              <div className="space-y-3 border-t border-border p-4">
-                <Show when="signed-out">
-                  <SheetClose asChild>
-                    <Button asChild className="w-full">
-                      <Link href="/destinations">Start your journey</Link>
-                    </Button>
-                  </SheetClose>
-                  <SheetClose asChild>
-                    <Button asChild variant="outline" className="w-full">
-                      <Link href="/sign-in">Sign in</Link>
-                    </Button>
-                  </SheetClose>
-                </Show>
-
-                <Show when="signed-in">
-                  <SheetClose asChild>
-                    <Button asChild className="w-full">
-                      <Link href="/dashboard">My dashboard</Link>
-                    </Button>
-                  </SheetClose>
-                  {isStaff && (
+                <div className="space-y-3 border-t border-border p-4">
+                  {signedIn ? (
                     <SheetClose asChild>
-                      <Button asChild variant="outline" className="w-full">
-                        <Link href="/admin">
-                          <ShieldCheck className="size-4" aria-hidden />
-                          Admin CRM
-                        </Link>
+                      <Button asChild className="w-full">
+                        <Link href="/dashboard">My dashboard</Link>
                       </Button>
                     </SheetClose>
+                  ) : (
+                    <>
+                      <SheetClose asChild>
+                        <Button asChild className="w-full">
+                          <Link href="/destinations">Start your journey</Link>
+                        </Button>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Button asChild variant="outline" className="w-full">
+                          <Link href="/sign-in">Sign in</Link>
+                        </Button>
+                      </SheetClose>
+                    </>
                   )}
-                </Show>
 
-                <a
-                  href={`tel:+${phoneDigits(settings.phone)}`}
-                  className="flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-brand"
-                >
-                  <Phone className="size-4" aria-hidden />
-                  {settings.phoneDisplay}
-                </a>
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
+                  <a
+                    href={`tel:+${phoneDigits(settings.phone)}`}
+                    className="flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-brand"
+                  >
+                    <Phone className="size-4" aria-hidden />
+                    {settings.phoneDisplay}
+                  </a>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </motion.div>
       </motion.header>
     </>

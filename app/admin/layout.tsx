@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AuthenticatedProviders } from "@/components/providers/authenticated-providers";
 
 /**
  * The CRM shell reads the current pathname for active-link state, which is
@@ -11,5 +12,9 @@ import { AdminShell } from "@/components/admin/admin-shell";
 export const instant = false;
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <AuthenticatedProviders>
+      <AdminShell>{children}</AdminShell>
+    </AuthenticatedProviders>
+  );
 }

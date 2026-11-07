@@ -373,7 +373,7 @@ function PassportCover({
       }}
     >
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-        <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.3em] text-white/35">
+        <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.3em] text-white/60">
           Passport
         </span>
 

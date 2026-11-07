@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { AuthenticatedProviders } from "@/components/providers/authenticated-providers";
 import { CustomerShell } from "@/components/customer/customer-shell";
 
 /**
@@ -11,5 +12,9 @@ import { CustomerShell } from "@/components/customer/customer-shell";
 export const instant = false;
 
 export default function CustomerLayout({ children }: { children: ReactNode }) {
-  return <CustomerShell>{children}</CustomerShell>;
+  return (
+    <AuthenticatedProviders>
+      <CustomerShell>{children}</CustomerShell>
+    </AuthenticatedProviders>
+  );
 }

@@ -115,7 +115,7 @@ export function DateField({
             className,
           )}
         >
-          <span className={cn("truncate", !selected && "text-[#98a2b3]")}>
+          <span className={cn("truncate", !selected && "text-muted-foreground")}>
             {selected ? DISPLAY.format(selected) : placeholder}
           </span>
           <CalendarIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />

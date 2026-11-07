@@ -388,7 +388,7 @@
 
   /* Eyebrow on dark sections, where muted-foreground is unreadable. */
   .text-eyebrow-dark {
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-white/45;
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-white/60;
   }
 
   /* A rule that draws itself in on hover — used on editorial links. */
@@ -594,15 +594,15 @@
  * leave someone staring at a locked screen. The script only shortens it. */
 
 .vd-splash {
-  animation: vd-splash-out 0.5s ease 2.7s forwards;
+  animation: vd-splash-out 0.4s ease 0.3s forwards;
 }
 
 .vd-splash[data-leaving] {
-  animation: vd-splash-out 0.5s ease forwards;
+  animation: vd-splash-out 0.4s ease forwards;
 }
 
 .vd-splash-mark {
-  animation: vd-splash-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: vd-splash-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Already welcomed this session — never paint it at all. Set by the blocking
@@ -632,6 +632,220 @@ html[data-welcomed] .vd-splash {
 
 @media (prefers-reduced-motion: reduce) {
   .vd-splash-mark {
+    animation: none;
+  }
+}
+
+
+/* ------------------------------ page transition --------------------------- */
+/* An aircraft crosses the screen on a flight arc and drags the page with it.
+ * See components/marketing/flight-transition.tsx.
+ *
+ * Transform, opacity and one dash offset — nothing here reads or writes
+ * layout, so the whole thing stays on the compositor even on a mid-range
+ * phone, which is what most of VisaDrive's visitors are holding. */
+
+/* The sheet is 118% of the viewport so its curved edge is always crossing
+ * the screen rather than sitting inside it, and the ellipse radius on the
+ * leading side is what makes that edge read as a wake rather than a panel. */
+/* Width and corner radius are a pair, and getting them wrong leaves the page
+ * showing through.
+ *
+ * A horizontal corner radius of R eats R of the sheet's width at the very top
+ * and the very bottom — that is what makes the edge a curve — so the sheet
+ * only truly covers `width x (1 - R)`. At 118% wide with R = 42% that was
+ * 68vw of cover for a 100vw screen, and the two corners furthest from the
+ * curve's apex were never covered at all. 135% at R = 20% covers 108vw at the
+ * extremes, with the curve still 27vw deep. */
+.vd-flight-sheet {
+  width: 135%;
+}
+
+.vd-flight-sheet--cover {
+  border-radius: 0 20% 20% 0 / 0 50% 50% 0;
+  animation: vd-flight-cover 480ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.vd-flight-sheet--reveal {
+  border-radius: 20% 0 0 20% / 50% 0 0 50%;
+  animation: vd-flight-reveal 520ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+/* Starts with the apex of the curve just off the left edge, ends with the
+ * shallow corners past the right edge. */
+@keyframes vd-flight-cover {
+  from {
+    transform: translate3d(-104%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Starts shifted left by a corner's worth, so the now-curved left edge still
+ * has its shallow corners off-screen and the first frame is a full cover. */
+@keyframes vd-flight-reveal {
+  from {
+    transform: translate3d(-24%, 0, 0);
+  }
+  to {
+    transform: translate3d(105%, 0, 0);
+  }
+}
+
+/* ---- the aircraft: constant rate across, eased climb and bank on top ---- */
+
+.vd-flight-x--in {
+  animation: vd-flight-x-in 480ms linear forwards;
+}
+
+.vd-flight-x--out {
+  animation: vd-flight-x-out 520ms linear forwards;
+}
+
+.vd-flight-y--in {
+  animation: vd-flight-y-in 480ms cubic-bezier(0.2, 0.75, 0.35, 1) forwards;
+}
+
+.vd-flight-y--out {
+  animation: vd-flight-y-out 520ms cubic-bezier(0.6, 0, 0.75, 0.3) forwards;
+}
+
+/* Climbing out of the lower left to the top of the arc, mid-screen. */
+@keyframes vd-flight-x-in {
+  from {
+    transform: translate3d(-24vw, 0, 0);
+  }
+  to {
+    transform: translate3d(46vw, 0, 0);
+  }
+}
+
+@keyframes vd-flight-y-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20vh, 0) rotate(-17deg);
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, -8vh, 0) rotate(0deg);
+  }
+}
+
+/* ...and descending away to the right, ahead of the sheet it is pulling. */
+@keyframes vd-flight-x-out {
+  from {
+    transform: translate3d(46vw, 0, 0);
+  }
+  to {
+    transform: translate3d(124vw, 0, 0);
+  }
+}
+
+@keyframes vd-flight-y-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, -8vh, 0) rotate(0deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 18vh, 0) rotate(17deg);
+  }
+}
+
+/* ---- the route arc, drawn in under the aircraft and wiped out after ---- */
+
+.vd-flight-trail--in {
+  animation: vd-flight-trail-in 480ms cubic-bezier(0.2, 0.75, 0.35, 1) forwards;
+}
+
+.vd-flight-trail--out {
+  animation: vd-flight-trail-out 520ms ease-in forwards;
+}
+
+@keyframes vd-flight-trail-in {
+  from {
+    stroke-dashoffset: 100;
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes vd-flight-trail-out {
+  from {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: -100;
+    opacity: 0;
+  }
+}
+
+/* Asked for stillness: no flight, no sheet. The component declines to run at
+ * all, and this is the backstop if it ever renders anyway. */
+@media (prefers-reduced-motion: reduce) {
+  .vd-flight-sheet--cover,
+  .vd-flight-sheet--reveal,
+  .vd-flight-x--in,
+  .vd-flight-x--out,
+  .vd-flight-y--in,
+  .vd-flight-y--out,
+  .vd-flight-trail--in,
+  .vd-flight-trail--out {
+    animation: none;
+  }
+}
+
+/* --------------------------- hero entrance -------------------------------- */
+/* The hero is the first thing anyone sees, so its entrance is CSS rather than
+ * JavaScript. A `motion` entrance renders at `opacity: 0` and cannot start
+ * until the bundle has hydrated, which held the hero photograph — the largest
+ * contentful paint on this page — invisible for a second longer than it took
+ * to download. These start on the first painted frame.
+ *
+ * `--rise-delay` comes from the element, so the cascade is still staged. */
+
+[data-rise] {
+  animation: vd-rise 550ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes vd-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.vd-hero-backdrop {
+  animation: vd-hero-backdrop-in 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes vd-hero-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-rise],
+  .vd-hero-backdrop {
     animation: none;
   }
 }

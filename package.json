@@ -42,6 +42,15 @@
     "vaul": "^1.1.2",
     "zod": "^4.6.7"
   },
+  "//browserslist": "Everything VisaDrive's customers actually use. Without it Next downlevels modern syntax and ships polyfills for Array.prototype.at and friends to browsers that have had them for years — dead weight on a phone.",
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 113",
+    "safari >= 16.4",
+    "ios_saf >= 16.4",
+    "and_chr >= 111"
+  ],
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",
     "@tailwindcss/turbopack": "^4",
