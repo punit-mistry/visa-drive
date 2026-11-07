@@ -1,10 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import { AmbientVideo } from "@/components/marketing/ambient-video";
 import { Reveal } from "@/components/marketing/reveal";
 import { Button } from "@/components/ui/button";
 import { LEGAL } from "@/lib/constants/site";
@@ -12,17 +10,12 @@ import { LEGAL } from "@/lib/constants/site";
 /**
  * Closing frame.
  *
- * Shibuya Crossing at night, held well back behind the type — it is
- * atmosphere, not content, so it carries no information and no alt text. The
- * still is a frame from the loop, so there is never a cut between scenes
- * when playback starts, and it is what renders whenever the video does not. Both buttons go
- * somewhere real: the catalogue, where an application actually begins, and
- * the contact form.
+ * It used to sit on a night photograph with a looping video behind it. Both
+ * were decoration, both were held at 30% under a scrim, and neither said
+ * anything the two buttons do not — so the section is just the ask now, on
+ * paper. Both buttons go somewhere real: the catalogue, where an application
+ * actually begins, and the contact form.
  */
-
-/** A frame from the loop below, so the two never cut between scenes. */
-const CTA_IMAGE = "/media/tokyo-night.jpg";
-const CTA_VIDEO = "/media/tokyo-night.mp4";
 
 export function FinalCta({
   title = "Your next chapter starts here.",
@@ -42,30 +35,14 @@ export function FinalCta({
   withDisclaimer?: boolean;
 }) {
   return (
-    <section className="relative isolate overflow-hidden bg-ink-black py-24 sm:py-28 lg:py-36">
-      <div aria-hidden className="absolute inset-0 opacity-30">
-        <Image
-          src={CTA_IMAGE}
-          alt=""
-          fill
-          sizes="100vw"
-          quality={70}
-          className="object-cover object-center"
-        />
-        <AmbientVideo src={CTA_VIDEO} />
-      </div>
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-gradient-to-t from-ink-black via-ink-black/80 to-ink-black/70"
-      />
-
+    <section className="relative isolate overflow-hidden bg-surface py-24 sm:py-28 lg:py-36">
       <div className="container-wide relative z-10">
         <Reveal className="max-w-3xl">
-          <p className="text-eyebrow-dark">Ready when you are</p>
+          <p className="text-eyebrow">Ready when you are</p>
 
-          <h2 className="display-xl mt-5 text-paper">{title}</h2>
+          <h2 className="display-xl mt-5 text-foreground">{title}</h2>
 
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-white/65 sm:text-lg">
+          <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
             {description}
           </p>
 
@@ -84,14 +61,14 @@ export function FinalCta({
               asChild
               size="lg"
               variant="outline"
-              className="h-12 border-white/30 bg-white/5 px-6 text-[15px] font-semibold text-white backdrop-blur-sm hover:border-white/50 hover:bg-white/10 hover:text-white dark:border-white/30 dark:bg-white/5"
+              className="h-12 border-border-strong bg-background px-6 text-[15px] font-semibold text-foreground backdrop-blur-sm hover:border-border-strong hover:bg-background hover:text-foreground dark:border-border-strong dark:bg-background"
             >
               <Link href={secondaryHref}>{secondaryLabel}</Link>
             </Button>
           </div>
 
           {withDisclaimer && (
-            <p className="mt-12 max-w-xl border-t border-white/12 pt-6 text-xs leading-relaxed text-white/40">
+            <p className="mt-12 max-w-xl border-t border-border pt-6 text-xs leading-relaxed text-muted-foreground">
               {LEGAL.noGuarantee}
             </p>
           )}

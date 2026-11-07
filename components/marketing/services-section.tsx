@@ -20,7 +20,7 @@ const SECTION_GROUND: Record<SectionTone, string> = {
   default: "bg-background",
   surface: "bg-paper",
   paper: "bg-paper",
-  dark: "bg-charcoal text-paper",
+  dark: "bg-surface text-foreground",
 };
 
 /**
@@ -33,15 +33,15 @@ const SECTION_GROUND: Record<SectionTone, string> = {
  */
 const SERVICE_IMAGE: Record<string, string> = {
   ds160_form_filling:
-    "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=60",
+"https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=60",
   express_appointment:
-    "https://images.unsplash.com/photo-1484100356142-db6ab6244067?auto=format&fit=crop&w=600&q=60",
+"https://images.unsplash.com/photo-1484100356142-db6ab6244067?auto=format&fit=crop&w=600&q=60",
   interview_guidance:
-    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=60",
+"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=60",
   dropbox_renewal:
-    "https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=600&q=60",
+"https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=600&q=60",
   appointment_rescheduling:
-    "https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=600&q=60",
+"https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=600&q=60",
 };
 
 /**
@@ -91,7 +91,7 @@ export function ServiceIndexList({
   return (
     <ul
       ref={listRef}
-      className={cn("relative border-t border-ink-black/12", className)}
+      className={cn("relative border-t border-border", className)}
       onPointerMove={handlePointerMove}
       onPointerLeave={() => setHovered(null)}
     >
@@ -117,7 +117,7 @@ export function ServiceIndexList({
               className="object-cover"
             />
           )}
-          <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-white/15" />
+          <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-border" />
         </motion.div>
       )}
 
@@ -138,14 +138,14 @@ export function ServiceIndexList({
               onFocus={() => setHovered(service.key)}
               onBlur={() => setHovered(null)}
               className={cn(
-                "group relative grid items-baseline gap-x-8 gap-y-2 overflow-hidden rounded-xl border-b border-ink-black/12 px-4 py-8 outline-none transition-colors duration-500 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60 sm:grid-cols-[auto_minmax(0,1fr)_auto] lg:grid-cols-[5rem_minmax(0,22rem)_minmax(0,1fr)_auto] lg:px-6 lg:py-10",
-                active && "bg-ink-black",
+"group relative grid items-baseline gap-x-8 gap-y-2 overflow-hidden rounded-xl border-b border-border px-4 py-8 outline-none transition-colors duration-500 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60 sm:grid-cols-[auto_minmax(0,1fr)_auto] lg:grid-cols-[5rem_minmax(0,22rem)_minmax(0,1fr)_auto] lg:px-6 lg:py-10",
+                active && "bg-surface",
               )}
             >
               <span
                 className={cn(
-                  "numeral relative z-10 text-2xl leading-none transition-colors duration-500 lg:text-3xl",
-                  active ? "text-brand" : "text-ink-black/25",
+"numeral relative z-10 text-2xl leading-none transition-colors duration-500 lg:text-3xl",
+                  active ? "text-brand" : "text-muted-foreground",
                 )}
               >
                 {String(position + 1).padStart(2, "0")}
@@ -153,8 +153,8 @@ export function ServiceIndexList({
 
               <h3
                 className={cn(
-                  "display-md relative z-10 transition-[color,transform] duration-500 ease-out",
-                  active ? "translate-x-1 text-paper" : "text-ink-black",
+"display-md relative z-10 transition-[color,transform] duration-500 ease-out",
+                  active ? "translate-x-1 text-foreground" : "text-foreground",
                 )}
               >
                 {service.name}
@@ -162,8 +162,8 @@ export function ServiceIndexList({
 
               <p
                 className={cn(
-                  "relative z-10 max-w-lg text-[15px] leading-relaxed transition-colors duration-500 sm:col-span-2 lg:col-span-1 lg:col-start-3",
-                  active ? "text-white/60" : "text-muted-foreground",
+"relative z-10 max-w-lg text-[15px] leading-relaxed transition-colors duration-500 sm:col-span-2 lg:col-span-1 lg:col-start-3",
+                  active ? "text-muted-foreground" : "text-muted-foreground",
                 )}
               >
                 {service.summary}
@@ -172,10 +172,10 @@ export function ServiceIndexList({
               <span
                 aria-hidden
                 className={cn(
-                  "relative z-10 hidden size-11 shrink-0 items-center justify-center rounded-full border transition-all duration-500 lg:flex",
+"relative z-10 hidden size-11 shrink-0 items-center justify-center rounded-full border transition-all duration-500 lg:flex",
                   active
                     ? "border-brand bg-brand text-brand-foreground"
-                    : "border-ink-black/15 text-ink-black",
+                    : "border-border text-foreground",
                 )}
               >
                 <ArrowUpRight className="size-4 transition-transform duration-500 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
@@ -213,7 +213,7 @@ export function ServicesSection({
           <Reveal className="grid gap-8 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-7">
               <p className="text-eyebrow">Our services</p>
-              <h2 className="display-xl mt-4 text-ink-black">
+              <h2 className="display-xl mt-4 text-foreground">
                 The work we take
                 <br />
                 off your hands.
@@ -235,7 +235,7 @@ export function ServicesSection({
 
         <Reveal className="mt-12 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-xl">
-            <h3 className="display-md text-ink-black">Something else?</h3>
+            <h3 className="display-md text-foreground">Something else?</h3>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               If your case does not fit neatly into one of these, tell us what
               you need and we will say honestly whether we can help.

@@ -52,18 +52,18 @@ export function VisaJourney() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section className="bg-ink-black py-20 text-paper sm:py-24 lg:py-32">
+    <section className="bg-surface py-20 text-foreground sm:py-24 lg:py-32">
       <div className="container-wide">
         <Reveal className="grid gap-8 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-7">
-            <p className="text-eyebrow-dark">The journey</p>
-            <h2 className="display-xl mt-4 text-paper">
+            <p className="text-eyebrow">The journey</p>
+            <h2 className="display-xl mt-4 text-foreground">
               Five steps,
               <br />
               start to finish.
             </h2>
           </div>
-          <p className="max-w-md text-base leading-relaxed text-white/55 lg:col-span-5">
+          <p className="max-w-md text-base leading-relaxed text-muted-foreground lg:col-span-5">
             A visa application is mostly paperwork and timing. We take both off
             your desk and keep you told at every stage.
           </p>
@@ -81,7 +81,7 @@ export function VisaJourney() {
                   delay: Math.min(index, 4) * 0.05,
                   ease: [0.22, 1, 0.36, 1],
                 }}
-                className="group relative grid gap-x-8 gap-y-3 border-t border-white/12 py-8 sm:grid-cols-[auto_minmax(0,1fr)] lg:grid-cols-[10rem_minmax(0,22rem)_minmax(0,1fr)] lg:py-11"
+                className="group relative grid gap-x-8 gap-y-3 border-t border-border py-8 sm:grid-cols-[auto_minmax(0,1fr)] lg:grid-cols-[10rem_minmax(0,22rem)_minmax(0,1fr)] lg:py-11"
               >
                 {/* The row underlines itself on hover: a red rule drawn
                     left to right over the hairline below it. Sitting on the
@@ -94,15 +94,15 @@ export function VisaJourney() {
                   className="pointer-events-none absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-brand transition-transform duration-500 ease-out group-hover:scale-x-100 group-focus-within:scale-x-100"
                 />
 
-                <span className="numeral text-5xl leading-none text-white/25 transition-colors duration-500 group-hover:text-brand lg:text-7xl">
+                <span className="numeral text-5xl leading-none text-muted-foreground transition-colors duration-500 group-hover:text-brand lg:text-7xl">
                   {step.number}
                 </span>
 
-                <h3 className="display-md text-paper transition-transform duration-500 ease-out group-hover:translate-x-1">
+                <h3 className="display-md text-foreground transition-transform duration-500 ease-out group-hover:translate-x-1">
                   {step.title}
                 </h3>
 
-                <p className="max-w-md text-[15px] leading-relaxed text-white/55 sm:col-start-2 lg:col-start-3">
+                <p className="max-w-md text-[15px] leading-relaxed text-muted-foreground sm:col-start-2 lg:col-start-3">
                   {step.body}
                 </p>
               </motion.div>
@@ -110,8 +110,8 @@ export function VisaJourney() {
           ))}
         </ol>
 
-        <Reveal className="flex flex-col gap-6 border-t border-white/12 pt-10 sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-xl text-xs leading-relaxed text-white/40">
+        <Reveal className="flex flex-col gap-6 border-t border-border pt-10 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-xl text-xs leading-relaxed text-muted-foreground">
             {LEGAL.noGuarantee} Our job is to make sure nothing in your
             application is the reason for a delay.
           </p>

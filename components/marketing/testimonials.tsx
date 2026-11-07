@@ -95,13 +95,13 @@ export function Testimonials({
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] lg:items-center lg:gap-20">
         {/* ------------------------------- left ---------------------------- */}
         <Reveal>
-          <p className={onDark ? "text-eyebrow-dark" : "text-eyebrow"}>
+          <p className={onDark ? "text-eyebrow" : "text-eyebrow"}>
             In their words
           </p>
           <h2
             className={cn(
-              "display-xl mt-4",
-              onDark ? "text-paper" : "text-ink-black",
+"display-xl mt-4",
+              onDark ? "text-foreground" : "text-foreground",
             )}
           >
             What travellers
@@ -138,12 +138,12 @@ export function Testimonials({
                     aria-label={`Testimonial ${i + 1} of ${count}`}
                     onClick={() => setIndex(i)}
                     className={cn(
-                      "h-1.5 rounded-full transition-all duration-500 focus-brand",
+"h-1.5 rounded-full transition-all duration-500 focus-brand",
                       i === index
                         ? "w-7 bg-brand"
                         : onDark
-                          ? "w-1.5 bg-white/25 hover:bg-white/50"
-                          : "w-1.5 bg-ink-black/20 hover:bg-ink-black/40",
+                          ? "w-1.5 bg-background hover:bg-background"
+                          : "w-1.5 bg-surface hover:bg-surface",
                     )}
                   />
                 ))}
@@ -172,9 +172,9 @@ export function Testimonials({
                 exit={reduceMotion ? undefined : { opacity: 0, y: -16 }}
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  "flex h-full flex-col rounded-2xl border p-7 lg:p-9",
+"flex h-full flex-col rounded-2xl border p-7 lg:p-9",
                   onDark
-                    ? "border-white/12 bg-white/[0.04]"
+                    ? "border-border bg-white/[0.04]"
                     : "border-border bg-card",
                 )}
               >
@@ -189,8 +189,8 @@ export function Testimonials({
 
                 <blockquote
                   className={cn(
-                    "mt-5 flex-1 text-lg leading-relaxed sm:text-xl",
-                    onDark ? "text-white/80" : "text-foreground",
+"mt-5 flex-1 text-lg leading-relaxed sm:text-xl",
+                    onDark ? "text-muted-foreground" : "text-foreground",
                   )}
                 >
                   {active.quote}
@@ -198,8 +198,8 @@ export function Testimonials({
 
                 <figcaption
                   className={cn(
-                    "mt-7 flex items-center gap-4 border-t pt-6",
-                    onDark ? "border-white/12" : "border-border",
+"mt-7 flex items-center gap-4 border-t pt-6",
+                    onDark ? "border-border" : "border-border",
                   )}
                 >
                   <Avatar
@@ -210,8 +210,8 @@ export function Testimonials({
                   <div className="min-w-0">
                     <p
                       className={cn(
-                        "text-sm font-semibold",
-                        onDark ? "text-paper" : "text-foreground",
+"text-sm font-semibold",
+                        onDark ? "text-foreground" : "text-foreground",
                       )}
                     >
                       {active.name}
@@ -219,8 +219,8 @@ export function Testimonials({
                     {active.context && (
                       <p
                         className={cn(
-                          "truncate text-sm",
-                          onDark ? "text-white/50" : "text-muted-foreground",
+"truncate text-sm",
+                          onDark ? "text-muted-foreground" : "text-muted-foreground",
                         )}
                       >
                         {active.context}
@@ -262,9 +262,9 @@ function Avatar({
     <span
       aria-hidden
       className={cn(
-        "flex size-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
+"flex size-12 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
         onDark
-          ? "border-white/15 bg-white/10 text-paper"
+          ? "border-border bg-background text-foreground"
           : "border-border bg-surface text-foreground",
       )}
     >
@@ -290,10 +290,10 @@ function CarouselButton({
       aria-label={label}
       onClick={onClick}
       className={cn(
-        "flex size-11 items-center justify-center rounded-full border transition-all duration-500 focus-brand",
+"flex size-11 items-center justify-center rounded-full border transition-all duration-500 focus-brand",
         onDark
-          ? "border-white/20 text-white/70 hover:border-brand hover:bg-brand hover:text-brand-foreground"
-          : "border-ink-black/15 text-ink-black hover:border-brand hover:bg-brand hover:text-brand-foreground",
+          ? "border-border-strong text-muted-foreground hover:border-brand hover:bg-brand hover:text-brand-foreground"
+          : "border-border text-foreground hover:border-brand hover:bg-brand hover:text-brand-foreground",
       )}
     >
       {children}

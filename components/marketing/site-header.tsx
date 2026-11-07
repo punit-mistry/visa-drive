@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Menu, Phone, UserRound } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useClerkSession } from "@/hooks/use-clerk-session";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSiteSettings } from "@/hooks/use-site-settings";
 import { MARKETING_NAV } from "@/lib/constants/site";
 import { phoneDigits } from "@/lib/helpers/format";
@@ -27,12 +25,13 @@ import { cn } from "@/lib/utils";
 /**
  * Marketing header.
  *
- * On the homepage it starts transparent and sits inside the cinematic hero,
- * then resolves into a blurred dark bar once the page has moved — so the
- * photograph owns the first screen and the chrome only asserts itself when it
- * starts overlapping content. Every other route has no dark hero to sit in,
- * so the bar is solid from the first paint rather than flashing white type
- * onto a white page.
+ * One sticky bar on every route, light on every route.
+ *
+ * It used to start transparent over a dark cinematic hero and then spring
+ * into a floating pill — four animated layout properties riding a spring on
+ * every scroll. The hero is light now, so there is nothing to disappear into,
+ * and the bar earns its presence with a hairline instead: no border at the
+ * top of the page, a 1px rule once the page has moved under it.
  */
 export function SiteHeader() {
   const pathname = usePathname();
@@ -59,50 +58,12 @@ export function SiteHeader() {
     open: boolean;
   } | null>(null);
 
-  const hasCinematicHero = pathname === "/";
-
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  /** True while the bar is floating over the hero photograph. */
-  const onDark = hasCinematicHero && !scrolled;
-
-  const reduceMotion = useReducedMotion();
-
-  // The resting bar has to line its logo up with the page content beneath it,
-  // and that content sits inside `.container-wide`. Since the padding is now
-  // animated it cannot come from responsive classes, so the breakpoints are
-  // read here instead — these numbers mirror `.container-wide` in globals.css
-  // and have to move with it.
-  const isSmUp = useMediaQuery("(min-width: 640px)");
-  const isLgUp = useMediaQuery("(min-width: 1024px)");
-  const isXlUp = useMediaQuery("(min-width: 1280px)");
-  const is2XlUp = useMediaQuery("(min-width: 1536px)");
-
-  const restingGutter = is2XlUp
-    ? 96
-    : isXlUp
-      ? 64
-      : isLgUp
-        ? 48
-        : isSmUp
-          ? 32
-          : 20;
-  const pillGutter = isSmUp ? 28 : 20;
-
-  // One spring drives every dimension that changes, so the bar resolves as a
-  // single object settling rather than four CSS curves finishing at slightly
-  // different moments. A spring is the whole difference in feel here: eased
-  // keyframes on layout properties always read as mechanical.
-  const spring = reduceMotion
-    ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 240, damping: 30, mass: 0.85 };
-
-  const gutter = scrolled ? (isSmUp ? 20 : 12) : 0;
 
   // A drawer left open across a navigation traps the visitor on the new page.
   // Keying the open flag to the pathname closes it automatically on navigation
@@ -114,18 +75,7 @@ export function SiteHeader() {
 
   return (
     <>
-      <motion.header
-        animate={{
-          paddingLeft: gutter,
-          paddingRight: gutter,
-          paddingTop: gutter,
-        }}
-        transition={spring}
-        className={cn(
-          "inset-x-0 top-0 z-50",
-          hasCinematicHero ? "fixed" : "sticky",
-        )}
-      >
+      <header className="sticky inset-x-0 top-0 z-50">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:elev-md"
@@ -133,54 +83,19 @@ export function SiteHeader() {
           Skip to content
         </a>
 
-        {/* At the top the bar spans the viewport edge to edge, the way it
-            always has. Once the page moves it detaches into a floating pill —
-            so the chrome stops being a lid on the page and starts being an
-            object on top of it. */}
-        <motion.div
-          animate={{
-            height: scrolled ? 64 : 80,
-            borderRadius: scrolled ? 999 : 0,
-            // 1760 is `.container-wide`'s ceiling: at rest the bar has to
-            // sit on exactly the same measure as the page under it.
-            maxWidth: scrolled ? 1600 : 1760,
-            paddingLeft: scrolled ? pillGutter : restingGutter,
-            paddingRight: scrolled ? pillGutter : restingGutter,
-          }}
-          transition={spring}
+        <div
           className={cn(
-            // Colour, shadow and blur stay on CSS transitions: they are paint,
-            // they are cheap, and they do not need physics. Only the
-            // dimensions ride the spring.
-            "relative mx-auto flex w-full items-center justify-between gap-4 border",
-            "transition-[background-color,border-color,box-shadow] duration-500 ease-out motion-reduce:transition-none",
-            scrolled && "elev-lg",
-            onDark
-              ? "border-transparent bg-transparent"
-              : hasCinematicHero
-                ? "border-white/12 bg-ink-black/75 backdrop-blur-xl"
-                : scrolled
-                  ? "border-border bg-background/85 backdrop-blur-xl"
-                  : "border-transparent bg-background/95 backdrop-blur-sm",
+            // Only colour moves, and it moves on a CSS transition: paint is
+            // cheap, and the bar does not need physics to justify itself.
+            "container-wide flex h-16 items-center justify-between gap-4",
+            "border-b transition-colors duration-300 ease-out motion-reduce:transition-none",
+            scrolled
+              ? "border-border bg-background/90 backdrop-blur-xl"
+              : "border-transparent bg-background",
           )}
         >
-          {/* The resting state's bottom rule. Kept as its own element so the
-              bar can carry a 1px border on all four sides the whole time and
-              only the colour has to move. */}
-          <span
-            aria-hidden
-            className={cn(
-              "pointer-events-none absolute inset-x-0 -bottom-px h-px transition-opacity duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-              onDark
-                ? "bg-transparent"
-                : hasCinematicHero
-                  ? "bg-white/12"
-                  : "bg-border",
-              scrolled ? "opacity-0" : "opacity-100",
-            )}
-          />
           <div className="flex items-center gap-10">
-            <Logo size="md" onDark={hasCinematicHero} />
+            <Logo size="md" />
 
             <nav aria-label="Main" className="hidden lg:block">
               <ul className="flex items-center gap-1">
@@ -191,13 +106,9 @@ export function SiteHeader() {
                       aria-current={isActive(item.href) ? "page" : undefined}
                       className={cn(
                         "rounded-md px-3 py-2 text-[13px] font-medium tracking-wide transition-colors focus-brand",
-                        hasCinematicHero
-                          ? isActive(item.href)
-                            ? "text-white"
-                            : "text-white/60 hover:text-white"
-                          : isActive(item.href)
-                            ? "text-foreground"
-                            : "text-muted-foreground hover:text-foreground",
+                        isActive(item.href)
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       {item.label}
@@ -212,10 +123,7 @@ export function SiteHeader() {
             <a
               href={`tel:+${phoneDigits(settings.phone)}`}
               className={cn(
-                "hidden items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition-colors focus-brand xl:inline-flex",
-                hasCinematicHero
-                  ? "text-white/60 hover:text-white"
-                  : "text-muted-foreground hover:text-foreground",
+                "hidden items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-brand xl:inline-flex",
               )}
             >
               <Phone className="size-4" aria-hidden />
@@ -228,11 +136,7 @@ export function SiteHeader() {
                   asChild
                   size="sm"
                   variant="outline"
-                  className={cn(
-                    "hidden sm:inline-flex",
-                    hasCinematicHero &&
-                      "border-white/30 bg-white/5 text-white hover:border-white/50 hover:bg-white/10 hover:text-white dark:border-white/30 dark:bg-white/5",
-                  )}
+                  className="hidden sm:inline-flex"
                 >
                   <Link href="/dashboard">My dashboard</Link>
                 </Button>
@@ -240,11 +144,7 @@ export function SiteHeader() {
                   asChild
                   size="sm"
                   variant="outline"
-                  className={cn(
-                    "hidden sm:inline-flex",
-                    hasCinematicHero &&
-                      "border-white/30 bg-white/5 text-white hover:border-white/50 hover:bg-white/10 hover:text-white dark:border-white/30 dark:bg-white/5",
-                  )}
+                  className="hidden sm:inline-flex"
                 >
                   <Link href="/sign-out">Sign out</Link>
                 </Button>
@@ -253,10 +153,7 @@ export function SiteHeader() {
                   size="icon"
                   variant="ghost"
                   aria-label="Your account"
-                  className={cn(
-                    hasCinematicHero &&
-                      "text-white/80 hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
-                  )}
+
                 >
                   <Link href="/dashboard/profile">
                     <UserRound className="size-5" aria-hidden />
@@ -269,11 +166,7 @@ export function SiteHeader() {
                   asChild
                   variant="ghost"
                   size="sm"
-                  className={cn(
-                    "hidden sm:inline-flex",
-                    hasCinematicHero &&
-                      "text-white/70 hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
-                  )}
+                  className="hidden sm:inline-flex"
                 >
                   <Link href="/sign-in">Sign in</Link>
                 </Button>
@@ -291,11 +184,7 @@ export function SiteHeader() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={cn(
-                    "lg:hidden",
-                    hasCinematicHero &&
-                      "text-white hover:bg-white/10 hover:text-white dark:hover:bg-white/10",
-                  )}
+                  className="lg:hidden"
                   aria-label="Open menu"
                 >
                   <Menu className="size-5" aria-hidden />
@@ -384,8 +273,8 @@ export function SiteHeader() {
               </SheetContent>
             </Sheet>
           </div>
-        </motion.div>
-      </motion.header>
+        </div>
+      </header>
     </>
   );
 }

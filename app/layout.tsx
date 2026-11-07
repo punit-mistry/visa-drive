@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Instrument_Serif, Manrope } from "next/font/google";
+import { Bricolage_Grotesque, Manrope } from "next/font/google";
 
 import { FlightTransition } from "@/components/marketing/flight-transition";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -9,22 +9,17 @@ import { SITE } from "@/lib/constants/site";
 import "./globals.css";
 
 /**
- * Editorial pairing: a high-contrast serif carries the display type, a
- * humanist sans carries everything functional — navigation, forms, tables and
- * the whole of the portal and CRM. The serif never appears in UI chrome.
+ * One family across every surface.
+ *
+ * Bricolage carries the display type and the UI alike; Manrope stays only as
+ * the metric fallback while the variable font loads. The editorial serif that
+ * used to carry headlines is gone — it set a different tone from the product
+ * behind it, and the sizes it wanted were doing the shouting.
  */
 const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-manrope",
   display: "swap",
-});
-
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  variable: "--font-instrument",
-  display: "swap",
-  weight: ["400"],
-  style: ["normal", "italic"],
 });
 
 /**
@@ -101,7 +96,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${manrope.variable} ${instrumentSerif.variable} ${bricolage.variable}`}
+      className={`${manrope.variable} ${bricolage.variable}`}
     >
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider

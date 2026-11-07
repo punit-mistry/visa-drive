@@ -4,8 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, FileCheck2, Headset, ShieldCheck } from "lucide-react";
 import { useQuery } from "convex/react";
-import { useRef, useMemo } from "react";
-import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { useMemo } from "react";
 
 import { api } from "@/convex/_generated/api";
 import type { PublishedDestination } from "@/components/marketing/catalogue";
@@ -18,56 +17,48 @@ import { SITE } from "@/lib/constants/site";
 /**
  * The opening frame.
  *
- * The previous version was a travel masthead — "Beyond borders, beyond
- * ordinary" over a photograph, with "Start your journey" as the call to
- * action. It was handsome and it said nothing: a visitor could not tell in the
- * first second whether this was an airline, a tour operator or a hotel group,
- * and there was nothing on the first screen to *do*.
+ * This used to be a full-bleed dark photograph with a parallax drift, two
+ * gradient scrims and a serif headline running to 144px. It looked like a
+ * travel magazine and read like one: handsome, loud, and slow to say what the
+ * business actually does.
  *
- * So the composition is unchanged — full-bleed photograph, parallax drift,
- * one shared entrance curve — and the content is rebuilt around the job:
+ * It is now a light frame on warm off-white, built the way the rest of the
+ * product is built:
  *
- *   1. A headline that names the category in its first three words.
- *   2. The search itself, in the hero, where the eye lands. Picking a
- *      destination is the conversion path, and it was previously two pages
- *      away on `/destinations`.
- *   3. Real destinations with their real starting prices underneath, so the
- *      page proves what it sells rather than asserting it.
+ *   1. One contained photograph rather than a full-screen wash, so the type
+ *      sits on paper instead of on an image and needs no scrim to be legible.
+ *   2. Type at a readable size, carrying emphasis by weight rather than by
+ *      filling the viewport.
+ *   3. Red only where it means something — the one clause in the headline
+ *      that is the promise, and the actions.
+ *   4. The search form floating over the seam between the frame and the page,
+ *      because a visitor who already knows where they are going should be
+ *      able to start without reading a word.
  *
- * Nothing in (3) is written here. Prices, processing times and the list of
- * countries all come from the published catalogue, and a destination whose
- * products are still seed data carries the "Sample data" mark it carries
- * everywhere else — a hero is exactly where an unverified fee would do the
- * most damage.
+ * No parallax and no scroll-linked transforms: the entrance is the CSS
+ * cascade in `[data-rise]`, which starts on the first painted frame instead
+ * of waiting for React to hydrate.
  */
 
 /**
- * The opening frame: the United States. It is the destination most of our
- * applications are for, so the first thing a visitor sees is the one we do
- * the most of.
- *
- * The water gives an even mid-tone across the lower half, which is where the
- * type and the search panel sit — a sunrise over cloud looks better in
- * isolation and then loses both in its own highlights.
+ * The United States. It is the bulk of the work that actually comes through
+ * the door, so it is what the first screen shows.
  */
 const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=1920&q=70";
+  "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=1600&q=70";
 
 /** Three promises the rest of the site has to keep, and does. */
 const ASSURANCES = [
-  { icon: FileCheck2, label: "Document checklist, checked by a specialist" },
-  { icon: ShieldCheck, label: "Encrypted uploads, private to your file" },
-  { icon: Headset, label: "A real team in Khar West, Mumbai" },
+  { icon: FileCheck2, label: "Checklist checked by a specialist" },
+  { icon: ShieldCheck, label: "Encrypted, private uploads" },
+  { icon: Headset, label: "A real team in Khar West" },
 ];
 
 export function Hero() {
-  const reduceMotion = useReducedMotion();
-  const sectionRef = useRef<HTMLElement>(null);
-
   /**
-   * The United States leads the rail, because it is the bulk of the work
-   * that actually comes through the door — the hero should open on what we
-   * do most of, not on whatever sits first in the catalogue order.
+   * The United States leads the rail, because it is the bulk of the work that
+   * actually comes through the door — the hero should open on what we do most
+   * of, not on whatever sits first in the catalogue order.
    *
    * Fetched a little wider than the six shown so the US is still reachable
    * when an admin has ordered it further down, then trimmed back to six.
@@ -84,36 +75,10 @@ export function Hero() {
       .slice(0, 6);
   }, [published]);
 
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ["start start", "end start"],
-  });
   /**
-   * Read straight off the scroll progress — no spring.
-   *
-   * This section used to feed `scrollYProgress` through `useSpring`, which on
-   * the marketing site means the value is eased *twice*: Lenis already runs
-   * the whole page through a 1.05s decelerating curve before motion ever sees
-   * it. Two easings stacked is what made the backdrop lag a beat behind the
-   * wheel and read as stutter. Lenis does the smoothing; this just maps it.
-   */
-  const mediaY = useTransform(scrollYProgress, [0, 1], ["0%", "14%"]);
-
-  /**
-   * The hero's entrance, as a CSS cascade rather than a JavaScript one.
-   *
-   * These elements are the first thing anyone sees, so their animation must
-   * not wait for React. A `motion` entrance renders the markup at
-   * `opacity: 0` and cannot begin until the bundle has downloaded, parsed and
-   * hydrated — which is exactly what made the hero photograph take a second
-   * longest-contentful-paint longer than the picture itself needed. The CSS
-   * in `[data-rise]` starts on the first painted frame instead, and reduced
-   * motion is handled by a media query rather than a hook, so it is correct
-   * before hydration too.
-   *
-   * `step` is the element's place in the cascade, not a delay in seconds. The
-   * whole sequence has to finish inside the welcome splash's minimum 750ms,
-   * or the splash lifts part-way through and you catch the hero mid-flight.
+   * `step` is the element's place in the entrance cascade, not a delay in
+   * seconds. The whole sequence finishes inside the welcome splash's minimum
+   * 750ms, so the splash never lifts part-way through it.
    */
   const rise = (step: number) => ({
     "data-rise": "",
@@ -121,127 +86,95 @@ export function Hero() {
   });
 
   return (
-    <section
-      ref={sectionRef}
-      className="relative isolate flex min-h-[92svh] flex-col justify-end overflow-hidden bg-ink-black pt-28 lg:min-h-[96svh] lg:pt-32"
-    >
-      {/* ----------------------------- backdrop ---------------------------- */}
-      {/*
-        Two deliberate choices here, both about the first second of the page:
+    <section className="relative bg-surface pt-24 pb-14 lg:pt-28 lg:pb-16">
+      <div className="container-wide">
+        <div className="grid items-center gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:gap-14">
+          {/* ------------------------------ copy ---------------------------- */}
+          <div>
+            <p
+              {...rise(0)}
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+            >
+              <span>Visa applications</span>
+              <span aria-hidden className="h-px w-6 bg-border-strong" />
+              <span>Khar West · Mumbai</span>
+            </p>
 
-        1. Only `opacity` animates on entry. It used to animate `scale` from
-           1.16 to 1.1 across 1.6s — a continuous re-rasterisation of a
-           full-viewport photograph, running while the browser was still
-           decoding that same photograph and hydrating the page. Opacity is
-           composited; scale on a raster that size is not free.
-        2. The layer is promoted up front with `will-change`, so the parallax
-           `y` moves an existing texture instead of asking the compositor to
-           build one on the first scroll frame — which is the jolt you feel
-           at the exact moment you start scrolling.
-      */}
-      <motion.div
-        aria-hidden
-        className="vd-hero-backdrop absolute inset-0 scale-110 transform-gpu"
-        style={
-          reduceMotion
-            ? undefined
-            : { y: mediaY, willChange: "transform", backfaceVisibility: "hidden" }
-        }
-      >
-        <Image
-          src={HERO_IMAGE}
-          alt=""
-          fill
-          priority
-          fetchPriority="high"
-          sizes="100vw"
-          quality={70}
-          className="object-cover object-center"
-        />
-      </motion.div>
+            <h1 {...rise(1)} className="display-hero mt-4 max-w-[15ch] text-foreground">
+              Apply for your visa.
+              <br />
+              <span className="text-brand">We handle the rest.</span>
+            </h1>
 
-      {/* Two scrims: a vertical one that beds the type into the frame, and a
-          left-weighted one so the headline keeps contrast over the brighter
-          part of the photograph. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-gradient-to-t from-ink-black from-15% via-ink-black/70 via-55% to-ink-black/25"
-      />
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-gradient-to-r from-ink-black/80 via-transparent to-transparent"
-      />
+            <p
+              {...rise(2)}
+              className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted-foreground"
+            >
+              {SITE.heroSubline}
+            </p>
 
-      <div className="container-wide relative z-10 pb-10 lg:pb-14">
-        {/* ------------------------------ masthead -------------------------- */}
-        <p
-          {...rise(0)}
-          className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/55 sm:text-[11px]"
+            <ul
+              {...rise(3)}
+              className="mt-7 flex flex-col gap-2.5 border-t border-border pt-5 sm:flex-row sm:flex-wrap sm:gap-x-7 sm:gap-y-2.5"
+            >
+              {ASSURANCES.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li
+                    key={item.label}
+                    className="flex items-center gap-2 text-[13px] text-muted-foreground"
+                  >
+                    <Icon className="size-3.5 shrink-0 text-brand" aria-hidden />
+                    {item.label}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* ----------------------------- picture -------------------------- */}
+          {/* One clean image, contained and cropped to a steady ratio, rather
+              than a full-screen wash the type has to fight. */}
+          <div
+            {...rise(2)}
+            className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-surface-strong lg:aspect-[5/4]"
+          >
+            <Image
+              src={HERO_IMAGE}
+              alt="The United States — the destination VisaDrive files for most often"
+              fill
+              priority
+              fetchPriority="high"
+              sizes="(min-width: 1024px) 48vw, 100vw"
+              quality={72}
+              className="object-cover object-center"
+            />
+          </div>
+        </div>
+
+        {/* ------------------------------ search ---------------------------- */}
+        {/* Floats over the seam between the frame above and the page below.
+            It is the point of the whole section, so it gets the one shadow. */}
+        <div
+          {...rise(4)}
+          className="elev-lg relative z-10 mt-8 rounded-2xl border border-border bg-background p-3 sm:p-4 lg:-mt-10"
         >
-          <span>Visa applications</span>
-          <span aria-hidden className="h-px w-6 bg-white/25" />
-          <span>Khar West · Mumbai</span>
-        </p>
-
-        <h1
-          {...rise(1)}
-          className="display-hero mt-5 max-w-[16ch] text-paper"
-        >
-          Apply for your visa.
-          <br />
-          <span className="text-brand">We handle the rest.</span>
-        </h1>
-
-        <p
-          {...rise(2)}
-          className="mt-5 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg"
-        >
-          {SITE.heroSubline}
-        </p>
-
-        {/* ------------------------------- search --------------------------- */}
-        {/* The point of the whole frame. A visitor who knows where they are
-            going can start from here without reading another word. */}
-        <div {...rise(3)} className="mt-8">
           <VisaDiscoveryForm />
         </div>
 
         {/* --------------------------- destinations ------------------------- */}
-        <div {...rise(4)} className="mt-7">
+        <div {...rise(5)} className="mt-7">
           <DestinationStrip destinations={destinations} />
         </div>
-
-        {/* ---------------------------- assurances -------------------------- */}
-        <ul
-          {...rise(5)}
-          className="mt-8 flex flex-col gap-2.5 border-t border-white/12 pt-6 sm:flex-row sm:flex-wrap sm:gap-x-8 sm:gap-y-3"
-        >
-          {ASSURANCES.map((item) => {
-            const Icon = item.icon;
-            return (
-              <li
-                key={item.label}
-                className="flex items-center gap-2.5 text-[13px] text-white/60"
-              >
-                <Icon className="size-4 shrink-0 text-brand" aria-hidden />
-                {item.label}
-              </li>
-            );
-          })}
-        </ul>
       </div>
     </section>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-
 /**
  * Real destinations, with their real starting prices.
  *
- * This is the row that makes the page legible as a visa service at a glance —
- * six flags and six prices say it faster than any sentence. Which is also why
- * every figure must be true: a destination still carrying seed products is
+ * Every figure must be true: a destination still carrying seed products is
  * marked, and one with no configured price shows its visa count instead of a
  * number we would have had to invent.
  */
@@ -256,7 +189,6 @@ function DestinationStrip({
     return (
       <VisaLoader
         compact
-        tone="dark"
         label="Loading live visa services"
         className="items-start text-left"
       />
@@ -274,32 +206,31 @@ function DestinationStrip({
 
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         Popular right now
       </p>
 
-      <ul className="scrollbar-thin -mx-1 mt-3 flex gap-2.5 overflow-x-auto px-1 pb-1">
+      <ul className="scrollbar-thin -mx-1 mt-2.5 flex gap-2 overflow-x-auto px-1 pb-1">
         {destinations.map((destination) => (
           <li key={destination._id} className="shrink-0">
             <Link
               href={`/destinations/${destination.slug}`}
-              className="group flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] px-3.5 py-2.5 backdrop-blur-sm transition-colors hover:border-white/35 hover:bg-white/[0.12] focus-visible:border-white/50 focus-visible:outline-none"
+              className="group focus-brand flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2 transition-colors hover:border-border-strong"
             >
               <CountryFlag
                 countryCode={destination.countryCode}
                 name={destination.name}
-                className="transition-colors group-hover:border-white/45"
               />
 
               <span className="min-w-0">
-                <span className="flex items-center gap-1.5 text-sm font-medium whitespace-nowrap text-white">
+                <span className="flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-foreground">
                   {destination.name}
                   <ArrowRight
-                    className="size-3 shrink-0 text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:text-brand"
+                    className="size-3 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-brand"
                     aria-hidden
                   />
                 </span>
-                <span className="mt-0.5 block text-xs whitespace-nowrap text-white/55">
+                <span className="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">
                   <DestinationFacts destination={destination} />
                 </span>
               </span>
@@ -309,7 +240,7 @@ function DestinationStrip({
       </ul>
 
       {anyUnverified && (
-        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-white/40">
+        <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <span className="size-1.5 shrink-0 rounded-full bg-warning" aria-hidden />
           Sample pricing — these figures have not been verified against an official
           source yet.

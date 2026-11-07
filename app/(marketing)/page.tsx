@@ -47,7 +47,7 @@ export default function HomePage() {
       <VisaJourney />
       <PassportSection />
       <ServicesEditorial />
-      <Testimonials tone="dark" />
+      <Testimonials tone="surface" />
       <FaqSection
         tone="paper"
         scope="global"

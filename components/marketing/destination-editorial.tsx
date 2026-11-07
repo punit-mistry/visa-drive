@@ -45,7 +45,7 @@ export function DestinationEditorial({ limit = 6 }: { limit?: number }) {
         <Reveal className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-3xl">
             <p className="text-eyebrow">Destinations</p>
-            <h2 className="display-xl mt-4 text-ink-black">
+            <h2 className="display-xl mt-4 text-foreground">
               Where will you
               <br />
               go next?
@@ -189,8 +189,8 @@ function Plate({
   return (
     <article
       className={cn(
-        "group relative isolate flex h-full flex-col justify-end overflow-hidden rounded-2xl bg-ink-black",
-        "has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-paper",
+"group relative isolate flex h-full flex-col justify-end overflow-hidden rounded-2xl bg-surface",
+"has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-paper",
         spec.frame,
       )}
     >
@@ -207,18 +207,18 @@ function Plate({
 
       <div
         aria-hidden
-        className="absolute inset-0 bg-gradient-to-t from-ink-black via-ink-black/45 via-50% to-ink-black/5 transition-opacity duration-500 group-hover:via-ink-black/55"
+        className="absolute inset-0 bg-gradient-to-t from-surface from-30% via-surface/85 via-70% to-surface/25"
       />
 
       <div className="relative z-10 p-6 lg:p-8">
-        <p className="text-eyebrow-dark flex items-center gap-2">
+        <p className="text-eyebrow flex items-center gap-2">
           <span className="text-sm leading-none" aria-hidden>
             {destination.flagEmoji}
           </span>
           {destination.region ?? "Visa services"}
         </p>
 
-        <h3 className={cn("mt-3 text-paper", spec.title)}>
+        <h3 className={cn("mt-3 text-foreground", spec.title)}>
           <Link
             href={`/destinations/${destination.slug}`}
             className="outline-none after:absolute after:inset-0 after:content-['']"
@@ -230,7 +230,7 @@ function Plate({
         {(destination.tagline ?? destination.summary) && (
           <p
             className={cn(
-              "mt-2.5 max-w-md text-sm leading-relaxed text-white/60",
+"mt-2.5 max-w-md text-sm leading-relaxed text-muted-foreground",
               size === "stack" && "line-clamp-2",
             )}
           >
@@ -238,21 +238,21 @@ function Plate({
           </p>
         )}
 
-        <div className="mt-6 flex items-end justify-between gap-4 border-t border-white/15 pt-5">
+        <div className="mt-6 flex items-end justify-between gap-4 border-t border-border pt-5">
           <div className="min-w-0">
             {categories.length > 0 && (
-              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 {categories.map((category) => categoryLabel(category)).join(" · ")}
               </p>
             )}
             {meta.length > 0 && (
-              <p className="mt-1.5 truncate text-sm font-medium text-white">
-                {meta.join("  ·  ")}
+              <p className="mt-1.5 truncate text-sm font-medium text-foreground">
+                {meta.join("·")}
               </p>
             )}
           </div>
 
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/25 text-white transition-all duration-500 group-hover:border-brand group-hover:bg-brand">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-border-strong text-foreground transition-all duration-500 group-hover:border-brand group-hover:bg-brand">
             <ArrowUpRight
               className="size-4 transition-transform duration-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
               aria-hidden
