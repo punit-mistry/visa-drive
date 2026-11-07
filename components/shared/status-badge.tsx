@@ -14,6 +14,12 @@ import {
   type PaymentStatusValue,
   type StatusTone,
 } from "@/lib/constants/statuses";
+import {
+  PARTNER_DOCUMENT_STATUS_CONFIG,
+  PARTNER_STATUS_CONFIG,
+  type PartnerDocumentStatus,
+  type PartnerStatus,
+} from "@/lib/constants/partners";
 
 /**
  * One badge component for every status vocabulary in the product, so a status
@@ -112,6 +118,31 @@ export function ConversationStatusBadge({
 /** Escape hatch for one-off labels that still need to match the system. */
 export function ToneBadge(props: BaseProps & { label: string; tone: StatusTone }) {
   return <Badge {...props} />;
+}
+
+/* ------------------------------ B2B partners ------------------------------
+ * A partner account and its verification paperwork have lifecycles of their
+ * own, so they get their own vocabularies — but they render through the same
+ * `TONE_CLASSES`, so an "Approved" partner and an "Approved" document read as
+ * the same kind of good news everywhere in the product.
+ */
+
+export function PartnerStatusBadge({
+  status,
+  ...rest
+}: BaseProps & { status: PartnerStatus }) {
+  const config = PARTNER_STATUS_CONFIG[status];
+  if (!config) return <Badge label={status} tone="neutral" {...rest} />;
+  return <Badge label={config.label} tone={config.tone} {...rest} />;
+}
+
+export function PartnerDocumentStatusBadge({
+  status,
+  ...rest
+}: BaseProps & { status: PartnerDocumentStatus }) {
+  const config = PARTNER_DOCUMENT_STATUS_CONFIG[status];
+  if (!config) return <Badge label={status} tone="neutral" {...rest} />;
+  return <Badge label={config.label} tone={config.tone} {...rest} />;
 }
 
 /* --------------------------- payment records -----------------------------

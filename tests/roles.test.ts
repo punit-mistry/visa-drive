@@ -18,6 +18,7 @@ import {
   ROLE_PERMISSIONS,
   USER_ROLES,
   hasPermission,
+  isStaffRole,
   type Permission,
   type UserRole,
 } from "../lib/constants/roles";
@@ -414,7 +415,11 @@ async function attempt(
 
 function expectedFor(role: UserRole, probe: Probe): "allowed" | "FORBIDDEN" {
   if (probe.permission === "staff") {
-    return role === "customer" ? "FORBIDDEN" : "allowed";
+    // "Not a customer" used to be the same thing as "staff". It is not any
+    // more: a B2B partner is a third kind of principal, authorised against
+    // the `partners` table and refused by `requireStaff` exactly as a
+    // customer is.
+    return isStaffRole(role) ? "allowed" : "FORBIDDEN";
   }
   return hasPermission(role, probe.permission) ? "allowed" : "FORBIDDEN";
 }

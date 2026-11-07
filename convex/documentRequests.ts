@@ -9,6 +9,7 @@ import {
   requirePermission,
 } from "./lib/auth";
 import { AUDIT_ACTIONS, recordAudit } from "./lib/audit";
+import { notifyPartnerOfApplicationEvent } from "./lib/partners";
 import { documentLabel } from "../lib/constants/documents";
 import { NOTIFICATION_TYPES, dedupeKeys } from "../lib/constants/notifications";
 import { PERMISSIONS } from "../lib/constants/roles";
@@ -115,6 +116,17 @@ export const create = mutation({
       link: `/dashboard/applications/${args.applicationId}`,
       dedupeKey: dedupeKeys.documentRequested(documentRequestId),
       applicationId: args.applicationId,
+    });
+
+    // On a B2B booking the agent is the one who will chase the paperwork, so
+    // they get their own copy under their own dedupe key. A no-op otherwise.
+    await notifyPartnerOfApplicationEvent(ctx, application, {
+      type: NOTIFICATION_TYPES.PARTNER_DOCUMENTS_REQUESTED,
+      title: `Documents needed on ${application.referenceId}`,
+      body: `${application.customerName} — ${label}. ${reason}`,
+      dedupeKey: dedupeKeys.partnerDocumentsRequested(documentRequestId),
+      documentLabels: [label],
+      reason,
     });
 
     return { documentRequestId };

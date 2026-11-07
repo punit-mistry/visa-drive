@@ -20,7 +20,8 @@ export type AuditEntityType =
   | "visa_product"
   | "destination"
   | "setting"
-  | "staff";
+  | "staff"
+  | "partner";
 
 export const AUDIT_ACTIONS = {
   APPLICATION_STATUS_CHANGED: "application.status_changed",
@@ -61,6 +62,28 @@ export const AUDIT_ACTIONS = {
 
   SETTINGS_UPDATED: "settings.updated",
   SEED_RUN: "seed.run",
+
+  /* ------------------------------ B2B partners -----------------------------
+   * The partner detail page's "Activity" tab is a read of `auditLogs` by
+   * entity, so these double as the partner's own timeline. That is why a
+   * partner's *own* consequential actions (registering, placing a booking)
+   * are audited here too, not only the office's actions on them.
+   */
+  PARTNER_REGISTERED: "partner.registered",
+  PARTNER_UPDATED: "partner.updated",
+  PARTNER_STATUS_CHANGED: "partner.status_changed",
+  PARTNER_APPROVED: "partner.approved",
+  PARTNER_REJECTED: "partner.rejected",
+  PARTNER_SUSPENDED: "partner.suspended",
+  PARTNER_REACTIVATED: "partner.reactivated",
+  PARTNER_DELETED: "partner.deleted",
+  PARTNER_PRICING_SET: "partner.pricing_set",
+  PARTNER_PRICING_CLEARED: "partner.pricing_cleared",
+  PARTNER_DOCUMENT_UPLOADED: "partner.document_uploaded",
+  PARTNER_DOCUMENT_REVIEWED: "partner.document_reviewed",
+  PARTNER_BOOKING_CREATED: "partner.booking_created",
+  PARTNER_CUSTOMER_ADDED: "partner.customer_added",
+  PARTNER_CUSTOMER_UPDATED: "partner.customer_updated",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

@@ -230,6 +230,7 @@
 
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
   --font-display: var(--font-instrument), ui-serif, Georgia, serif;
+  --font-dashboard: var(--font-bricolage), var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --radius-xs: calc(var(--radius) - 6px);
@@ -847,5 +848,14 @@ html[data-welcomed] .vd-splash {
   [data-rise],
   .vd-hero-backdrop {
     animation: none;
+  }
+}
+
+@layer utilities {
+  /* Dashboard headings and figures: portal and CRM only. */
+  .font-dashboard {
+    font-family: var(--font-dashboard);
+    font-feature-settings: "ss01" 1, "cv11" 1;
+    letter-spacing: -0.02em;
   }
 }

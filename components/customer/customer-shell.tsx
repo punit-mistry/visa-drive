@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
 import {
   Bell,
+  Building2,
   CreditCard,
   FileText,
   LayoutDashboard,
@@ -41,7 +42,8 @@ const NAV_ITEMS = [
  */
 export function CustomerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isLoading, isStaff, isSuspended, profileIssue } = useCurrentUser();
+  const { user, isLoading, isStaff, isPartner, isSuspended, profileIssue } =
+    useCurrentUser();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === href;
@@ -94,6 +96,15 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
                         <ShieldCheck className="size-4" aria-hidden />
                         <span className="hidden sm:inline">Admin CRM</span>
                         <span className="sm:hidden">Admin</span>
+                      </Link>
+                    </Button>
+                  )}
+                  {isPartner && (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/partner/dashboard">
+                        <Building2 className="size-4" aria-hidden />
+                        <span className="hidden sm:inline">Partner portal</span>
+                        <span className="sm:hidden">Partner</span>
                       </Link>
                     </Button>
                   )}

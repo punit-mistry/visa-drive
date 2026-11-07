@@ -16,8 +16,9 @@ same change.
    from other Convex functions or the scheduler.
 3. Protected functions begin with a helper from `convex/lib/auth.ts`:
    `requireUser`, `requireStaff`, `requirePermission`, `requireRole`,
-   `requireApplicationAccess`, `requireDocumentAccess`,
-   `requireConversationAccess`. **Never** read a role from an argument.
+   `requireApplicationAccess`, `requireBookingEditor`, `requireDocumentAccess`,
+   `requireConversationAccess`, `requirePartner`. **Never** read a role — or a
+   partner id — from an argument.
 4. Money is an integer in the smallest currency unit (paise).
 5. Admin actions that change status, money, permissions or customer-visible
    data call `recordAudit` from `convex/lib/audit.ts`.
@@ -109,6 +110,74 @@ same change.
 | `markCompleted` | mutation | Requires `application:update_status`. |
 | `exportCsv` | action | Requires `application:export`. Returns a CSV string. |
 
+## `convex/partners.ts`
+
+B2B partner accounts. Approval (`setStatus` → `approved`) is the **only** thing
+that grants the `partner` role, and anything else takes it back;
+`users.setRole` deliberately cannot reach the role at all
+(`assignableRoles` excludes it).
+
+| Export | Kind | Purpose |
+| --- | --- | --- |
+| `register` | mutation | Signed-in caller applies to become a partner. Re-submitting while pending/rejected updates the same row rather than creating a second. Notifies staff holding `partner:approve`. |
+| `myProfile` | query | The caller's own partner row via `publicPartnerView` (no internal note, no reviewer), or `null`. Never throws — the "not a partner yet" screen needs it. |
+| `updateMyProfile` | mutation | Partner edits their own business details. Changing name, type or GSTIN on an approved account returns it to `under_review`. |
+| `listForAdmin` | query | Paginated + filters `{ search?, status?, businessType?, sort? }`. Requires `partner:view`. |
+| `overview` | query | KPI strip, top partners, pending approvals, recent activity. Requires `partner:view`. |
+| `getForAdmin` | query | Partner + login + documents + allowed transitions. Requires `partner:view`. |
+| `bookingsForAdmin` / `customersForAdmin` | query | Paginated, scoped to one partner. Requires `partner:view`. |
+| `activityForAdmin` | query | The partner's timeline, read from `auditLogs` by entity. |
+| `createByAdmin` | mutation | Requires `partner:manage` (plus `partner:approve` for `approveNow`). Reuses an existing login by email; refuses a staff address. |
+| `updateByAdmin` / `setInternalNote` | mutation | Requires `partner:manage`. |
+| `setDefaultMarkup` | mutation | Requires `partner:pricing`. Audited + notifies the partner. |
+| `setStatus` | mutation | Requires `partner:approve`. Validates against `PARTNER_TRANSITIONS`; reject/suspend demand a reason. Grants or revokes the role. Audited + notifies. |
+| `remove` | mutation | Requires `partner:manage`. Soft delete — bookings and audit trail survive. |
+| `recount` | mutation | Rebuilds the denormalised counters. |
+| `exportCsv` | action | Requires `partner:export`. |
+| `myDashboard` | query | The partner's own KPIs and trend. Scoped by `requirePartner`. |
+| `myQuote` | query | Server-computed price for one product at one traveller count. |
+
+## `convex/partnerPricing.ts`
+
+One rule per (partner, visa product); the row stores the *recipe*
+(`markup_percent` / `markup_amount` / `fixed_price`), never a resolved total,
+so a catalogue change flows through without a backfill.
+
+| Export | Kind | Purpose |
+| --- | --- | --- |
+| `listForPartner` | query | The margin table. Requires `partner:view`. |
+| `setRule` | mutation | Requires `partner:pricing`. Refuses a fixed price below the government fee. Audited + notifies. |
+| `clearRule` | mutation | Requires `partner:pricing`. Deactivates rather than deletes. |
+| `bulkSetForDestination` | mutation | Requires `partner:pricing`. Markup modes only. |
+| `myCatalogue` | query | The partner's own read-only price list. Partner id comes from the session. |
+| `myProduct` | query | One product + requirements + the partner's quote, for the booking wizard. |
+
+## `convex/partnerBookings.ts`
+
+**No function here takes a partner id as an argument** — every one resolves it
+from the session with `requirePartner`, which is what makes cross-partner
+access impossible rather than merely checked.
+
+| Export | Kind | Purpose |
+| --- | --- | --- |
+| `upsertCustomer` | mutation | Add or edit a customer on the caller's own book. Links an existing `users` row by email; refuses a staff address. |
+| `listMyCustomers` / `myCustomer` | query | The caller's customer book and one customer's booking history. |
+| `archiveCustomer` | mutation | Archive / restore. |
+| `createDraft` | mutation | Starts a booking. `pricing` and `partnerMargin` are computed by `resolvePartnerQuote`; the traveller owns the application, the partner is stamped on it. Idempotent per (product, customer). |
+| `listMine` / `getMine` / `listMyDrafts` | query | Scoped reads. `getMine` strips the internal timeline and the assigned agent, and adds the margin. |
+| `discardDraft` | mutation | Cancels an unsubmitted draft. |
+
+Submission goes through the existing `applications.submit` — there is no second
+booking system. `requireBookingEditor` in `convex/lib/auth.ts` is what lets the
+partner reach the wizard mutations (`getDraft`, `saveDraftStep`, `submit`,
+`cancelMine`) on an application the traveller owns.
+
+## `convex/partnerDocuments.ts`
+
+`generateUploadUrl`, `attach`, `listMine`, `listForAdmin` (`partner:view`),
+`review` (`partner:approve`, rejection needs a note), `remove`. Also exports
+`requirePartnerDocumentAccess`, used by `documents.getPartnerSignedUrl`.
+
 ## `convex/applicants.ts`
 
 `listByApplication`, `upsert`, `remove`, `reorder`. Owner-or-staff, ownership
@@ -122,10 +191,15 @@ verified through the parent application.
 
 | Export | Kind | Purpose |
 | --- | --- | --- |
-| `generateUploadUrl` | mutation | Owner-or-staff. Checks the application is still editable. |
+| `generateUploadUrl` | mutation | Owner-or-staff-or-partner. Checks the application is still editable. |
 | `attach` | mutation | Records a document after upload. Supersedes any previous version. |
 | `listByApplication` | query | Owner-or-staff. Returns the checklist merged with uploads. |
-| `getSignedUrl` | query | **The only way a file URL is ever minted.** Ownership/permission checked. |
+| `getSignedUrl` | query | Mints a traveller file's URL after `requireDocumentAccess`. |
+| `getPartnerSignedUrl` | query | Mints a partner's business-document URL after `requirePartnerDocumentAccess`. |
+
+**These two exports are the only places in the codebase that call
+`ctx.storage.getUrl`.** Both live in this module so "where can a file URL come
+from?" has a one-file answer.
 | `review` | mutation | Requires `document:review`. `{ documentId, status, note? }`. Audited + notifies. |
 | `remove` | mutation | Owner (before submit) or `document:delete`. |
 | `listForAdmin` | query | Paginated, filter `{ status?, applicationId?, reviewerId? }`. |

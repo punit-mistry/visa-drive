@@ -238,6 +238,18 @@ export function SiteHeader() {
                 </Button>
                 <Button
                   asChild
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    "hidden sm:inline-flex",
+                    hasCinematicHero &&
+                      "border-white/30 bg-white/5 text-white hover:border-white/50 hover:bg-white/10 hover:text-white dark:border-white/30 dark:bg-white/5",
+                  )}
+                >
+                  <Link href="/sign-out">Sign out</Link>
+                </Button>
+                <Button
+                  asChild
                   size="icon"
                   variant="ghost"
                   aria-label="Your account"
@@ -334,11 +346,18 @@ export function SiteHeader() {
 
                 <div className="space-y-3 border-t border-border p-4">
                   {signedIn ? (
-                    <SheetClose asChild>
-                      <Button asChild className="w-full">
-                        <Link href="/dashboard">My dashboard</Link>
-                      </Button>
-                    </SheetClose>
+                    <>
+                      <SheetClose asChild>
+                        <Button asChild className="w-full">
+                          <Link href="/dashboard">My dashboard</Link>
+                        </Button>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Button asChild variant="outline" className="w-full">
+                          <Link href="/sign-out">Sign out</Link>
+                        </Button>
+                      </SheetClose>
+                    </>
                   ) : (
                     <>
                       <SheetClose asChild>

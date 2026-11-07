@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/convex/_generated/api";
 import {
+  isPartnerRole,
   isStaffRole,
   roleAtLeast,
   type Permission,
@@ -102,6 +103,12 @@ export function useCurrentUser() {
       profileIssue: user === null ? profileIssue : null,
       role,
       isStaff: !!user && isStaffRole(user.role),
+      /**
+       * An approved B2B partner. Used only to offer the portal link — what a
+       * partner may actually do is decided by `requirePartner` against their
+       * `partners` row, server-side, on every call.
+       */
+      isPartner: !!user && isPartnerRole(user.role),
       isSuspended,
       permissions,
       can: (permission: Permission) => permissions.has(permission),

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Serif, Manrope } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Serif, Manrope } from "next/font/google";
 
 import { FlightTransition } from "@/components/marketing/flight-transition";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -25,6 +25,17 @@ const instrumentSerif = Instrument_Serif({
   display: "swap",
   weight: ["400"],
   style: ["normal", "italic"],
+});
+
+/**
+ * Dashboard display face. Used for the headings and figures inside the
+ * portal and the CRM only, so the dashboards have their own voice while the
+ * body type stays the calm sans. Marketing keeps the editorial serif.
+ */
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-bricolage",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -90,7 +101,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${manrope.variable} ${instrumentSerif.variable}`}
+      className={`${manrope.variable} ${instrumentSerif.variable} ${bricolage.variable}`}
     >
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider

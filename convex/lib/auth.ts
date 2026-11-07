@@ -3,12 +3,14 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import {
   hasPermission,
+  isPartnerRole,
   isStaffRole,
   resolvePermissions,
   roleAtLeast,
   type Permission,
   type UserRole,
 } from "../../lib/constants/roles";
+import { partnerCanTrade } from "../../lib/constants/partners";
 
 /* ============================================================================
  * Authorisation helpers.
@@ -201,6 +203,91 @@ export async function callerHasPermission(
   );
 }
 
+/* -------------------------------- partners ------------------------------- */
+
+/**
+ * The `partners` row for a login, if there is one.
+ *
+ * Lives here rather than in `convex/lib/partners.ts` so that
+ * `requireApplicationAccess` can resolve a partner caller without the two
+ * modules importing each other.
+ */
+export async function getPartnerForUser(
+  ctx: AnyCtx,
+  userId: Id<"users">,
+): Promise<Doc<"partners"> | null> {
+  const partner = await ctx.db
+    .query("partners")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .unique();
+
+  if (!partner || partner.isDeleted) return null;
+  return partner;
+}
+
+export interface PartnerContext {
+  user: Doc<"users">;
+  partner: Doc<"partners">;
+}
+
+/**
+ * Throws unless the caller is a signed-in, **approved** partner.
+ *
+ * Three distinct failures, three distinct codes, because the portal shows a
+ * different screen for each: no partner record at all (offer registration),
+ * a record that is not approved yet (show the pending screen), and a record
+ * that was suspended or rejected (show why).
+ */
+export async function requirePartner(ctx: AnyCtx): Promise<PartnerContext> {
+  const user = await requireUser(ctx);
+
+  const partner = await getPartnerForUser(ctx, user._id);
+  if (!partner) {
+    throw new ConvexError({
+      code: "NO_PARTNER_ACCOUNT",
+      message: "This account is not registered as a VisaDrive partner.",
+    });
+  }
+
+  if (!partnerCanTrade(partner.status)) {
+    throw new ConvexError({
+      code: "PARTNER_NOT_APPROVED",
+      message:
+        partner.status === "rejected"
+          ? "This partner application was not approved."
+          : partner.status === "suspended"
+            ? "This partner account is currently suspended."
+            : "This partner account is still being reviewed.",
+      status: partner.status,
+      reason: partner.statusReason,
+    });
+  }
+
+  // A partner whose `users.role` was changed out from under their partner row
+  // is a mismatch we refuse rather than paper over.
+  if (!isPartnerRole(user.role)) {
+    authError(
+      "FORBIDDEN",
+      "This account is no longer set up as a partner login.",
+    );
+  }
+
+  return { user, partner };
+}
+
+/**
+ * The caller's partner row without insisting it be approved, for the screens
+ * that exist precisely to show an unapproved state. Returns `null` for a
+ * caller who has never registered.
+ */
+export async function getPartnerContext(
+  ctx: AnyCtx,
+): Promise<{ user: Doc<"users">; partner: Doc<"partners"> | null } | null> {
+  const user = await getAuthUser(ctx);
+  if (!user) return null;
+  return { user, partner: await getPartnerForUser(ctx, user._id) };
+}
+
 /* ------------------------------- ownership ------------------------------- */
 
 export interface ApplicationAccess {
@@ -226,6 +313,14 @@ export interface ApplicationAccess {
    */
   actingAsStaff: boolean;
   staff: StaffContext | null;
+  /**
+   * True when the caller reaches this application as the B2B partner that
+   * placed it. A partner has the *applicant side* of the booking — they may
+   * read it, fill it in and upload for it — and never the office side: no
+   * status changes, no internal timeline, no other partner's rows.
+   */
+  viaPartner: boolean;
+  partner: Doc<"partners"> | null;
 }
 
 /**
@@ -250,6 +345,43 @@ export async function requireApplicationAccess(
 
   const isOwner = application.userId === user._id;
 
+  /* ------------------------------ partners ------------------------------ */
+  // Checked before the customer branch, because a partner is not the owner of
+  // the bookings they place — the traveller is — and the customer branch
+  // would refuse them on exactly that ground.
+  if (isPartnerRole(user.role)) {
+    const partner = await getPartnerForUser(ctx, user._id);
+    const viaPartner =
+      !!partner &&
+      !!application.partnerId &&
+      application.partnerId === partner._id &&
+      partnerCanTrade(partner.status);
+
+    if (!viaPartner && !isOwner) {
+      authError("FORBIDDEN", "You do not have access to this application.");
+    }
+
+    // `write` means "acting as staff". A partner never is: they cannot move
+    // an application's official status, however their own booking it is.
+    if (opts.write) {
+      authError(
+        "FORBIDDEN",
+        "Only VisaDrive staff can change an application's status.",
+      );
+    }
+
+    return {
+      user,
+      application,
+      isOwner,
+      viaStaff: false,
+      actingAsStaff: false,
+      staff: null,
+      viaPartner,
+      partner: viaPartner ? partner : null,
+    };
+  }
+
   /* ----------------------------- customers ------------------------------ */
   if (!isStaffRole(user.role)) {
     if (!isOwner) {
@@ -268,6 +400,8 @@ export async function requireApplicationAccess(
       viaStaff: false,
       actingAsStaff: false,
       staff: null,
+      viaPartner: false,
+      partner: null,
     };
   }
 
@@ -305,7 +439,64 @@ export async function requireApplicationAccess(
     viaStaff,
     actingAsStaff: viaStaff && !isOwner,
     staff: viaStaff ? staff : null,
+    viaPartner: false,
+    partner: null,
   };
+}
+
+/**
+ * Who may still fill in, submit or walk away from a booking: the customer who
+ * owns it, or the partner who placed it.
+ *
+ * The wizard mutations (`getDraft`, `saveDraftStep`, `submit`, `cancelMine`)
+ * all used a bare `application.userId !== user._id`, which is correct for a
+ * direct booking and wrong for a B2B one — the traveller owns the row, but it
+ * is the agent who is typing. This is the one place that distinction is made,
+ * so the whole wizard keeps one definition of "the applicant side".
+ *
+ * Deliberately *not* staff: the office has its own, audited mutations for
+ * correcting a submitted booking, and autosaving over a customer's half-typed
+ * form from the CRM is the bug this avoids.
+ */
+export async function requireBookingEditor(
+  ctx: AnyCtx,
+  applicationId: Id<"applications">,
+): Promise<{
+  user: Doc<"users">;
+  application: Doc<"applications">;
+  isOwner: boolean;
+  viaPartner: boolean;
+  partner: Doc<"partners"> | null;
+}> {
+  const user = await requireUser(ctx);
+  const application = await ctx.db.get(applicationId);
+
+  if (!application) {
+    authError("NOT_FOUND", "Application not found.");
+  }
+
+  if (application.userId === user._id) {
+    return { user, application, isOwner: true, viaPartner: false, partner: null };
+  }
+
+  if (isPartnerRole(user.role) && application.partnerId) {
+    const partner = await getPartnerForUser(ctx, user._id);
+    if (
+      partner &&
+      application.partnerId === partner._id &&
+      partnerCanTrade(partner.status)
+    ) {
+      return {
+        user,
+        application,
+        isOwner: false,
+        viaPartner: true,
+        partner,
+      };
+    }
+  }
+
+  authError("FORBIDDEN", "You do not have access to this application.");
 }
 
 /**
@@ -327,6 +518,22 @@ export async function requireDocumentAccess(
 
   if (document.userId === user._id) {
     return { user, document, viaStaff: false };
+  }
+
+  // A partner uploaded these on their customer's behalf and has to be able to
+  // check what went in — but only on an application they themselves placed.
+  if (isPartnerRole(user.role)) {
+    const application = await ctx.db.get(document.applicationId);
+    const partner = await getPartnerForUser(ctx, user._id);
+    if (
+      application &&
+      partner &&
+      application.partnerId === partner._id &&
+      partnerCanTrade(partner.status)
+    ) {
+      return { user, document, viaStaff: false };
+    }
+    authError("FORBIDDEN", "You do not have access to this document.");
   }
 
   if (!isStaffRole(user.role)) {

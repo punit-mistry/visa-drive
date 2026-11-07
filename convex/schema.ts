@@ -19,6 +19,8 @@ import { v } from "convex/values";
 
 export const userRole = v.union(
   v.literal("customer"),
+  /** B2B travel agent / agency. Authorised through the `partners` table. */
+  v.literal("partner"),
   v.literal("support_agent"),
   v.literal("visa_agent"),
   v.literal("manager"),
@@ -129,6 +131,38 @@ export const entityType = v.union(
   v.literal("destination"),
   v.literal("setting"),
   v.literal("staff"),
+  v.literal("partner"),
+);
+
+/* ------------------------------ B2B partners ------------------------------ */
+
+export const partnerStatus = v.union(
+  v.literal("pending"),
+  v.literal("under_review"),
+  v.literal("approved"),
+  v.literal("rejected"),
+  v.literal("suspended"),
+);
+
+export const partnerBusinessType = v.union(
+  v.literal("travel_agency"),
+  v.literal("tour_operator"),
+  v.literal("corporate"),
+  v.literal("freelance_agent"),
+  v.literal("education_consultant"),
+  v.literal("other"),
+);
+
+export const partnerDocumentStatus = v.union(
+  v.literal("pending_review"),
+  v.literal("verified"),
+  v.literal("rejected"),
+);
+
+export const partnerPricingMode = v.union(
+  v.literal("markup_percent"),
+  v.literal("markup_amount"),
+  v.literal("fixed_price"),
 );
 
 // Reusable object validators -------------------------------------------------
@@ -147,6 +181,33 @@ const priceBreakdown = v.object({
   travellerCount: v.number(),
   subtotal: v.number(),
   total: v.number(),
+});
+
+/**
+ * What a partner booking cost and what the agent earned, frozen at booking
+ * time beside `pricing`.
+ *
+ * `pricing.total` on a partner booking is the **partner price** — the amount
+ * the agent's own customer pays, and therefore the amount Razorpay is asked
+ * for. `basePrice` is the catalogue total VisaDrive charges the partner, and
+ * `marginAmount` is every rupee between the two. Keeping all three means a
+ * later pricing change never rewrites what was earned on a past booking.
+ */
+const partnerMarginSnapshot = v.object({
+  currency: v.string(),
+  basePrice: v.number(),
+  partnerPrice: v.number(),
+  marginAmount: v.number(),
+  marginPercent: v.number(),
+  /** Which rule produced it, for the margin report. `base` = no rule. */
+  mode: v.union(
+    v.literal("base"),
+    v.literal("markup_percent"),
+    v.literal("markup_amount"),
+    v.literal("fixed_price"),
+  ),
+  /** The rule's configured value at the time, for the audit trail. */
+  ruleValue: v.optional(v.number()),
 });
 
 const addressValidator = v.object({
@@ -386,6 +447,18 @@ export default defineSchema({
 
     pricing: priceBreakdown,
 
+    /* ---------------------------- B2B partners ----------------------------
+     * Absent on every direct (B2C) booking, which is what keeps the existing
+     * customer flow untouched. Present and indexed on a partner booking, so
+     * "every B2B booking has a valid partner association" is one field rather
+     * than a parallel table. The application's `userId` is still the end
+     * customer — the partner is who *placed* it, never who owns it.
+     */
+    partnerId: v.optional(v.id("partners")),
+    /** The partner's own login that created it, for their activity log. */
+    createdByPartnerUserId: v.optional(v.id("users")),
+    partnerMargin: v.optional(partnerMarginSnapshot),
+
     assignedAgentId: v.optional(v.id("users")),
     assignedAt: v.optional(v.number()),
 
@@ -421,6 +494,10 @@ export default defineSchema({
     .index("by_createdAt", ["createdAt"])
     .index("by_status_createdAt", ["status", "createdAt"])
     .index("by_draft_createdAt", ["isDraft", "createdAt"])
+    .index("by_partnerId", ["partnerId"])
+    .index("by_partner_createdAt", ["partnerId", "createdAt"])
+    .index("by_partner_status", ["partnerId", "status"])
+    .index("by_partner_draft", ["partnerId", "isDraft"])
     .searchIndex("search_applications", {
       searchField: "customerName",
       filterFields: ["status", "paymentStatus", "destinationId"],
@@ -606,6 +683,193 @@ export default defineSchema({
     .index("by_providerEventId", ["providerEventId"])
     .index("by_createdAt", ["createdAt"])
     .index("by_status_createdAt", ["status", "createdAt"]),
+
+  /* ------------------------------------------------------------- partners */
+  /**
+   * A B2B travel agent, agency or corporate desk.
+   *
+   * One row per business, keyed to exactly one `users` row — the person who
+   * signs in. Granting approval is what flips that user's `role` to
+   * `"partner"`; nothing else does. The counters are denormalised for the
+   * directory table, which renders a hundred rows at a time and must not do a
+   * hundred index scans to show "bookings" per row.
+   */
+  partners: defineTable({
+    /** Human-readable account number, e.g. `VDP-0042`. */
+    partnerCode: v.string(),
+    /** The login. Unique: one partner account per sign-in. */
+    userId: v.id("users"),
+
+    // Business information
+    agencyName: v.string(),
+    businessType: partnerBusinessType,
+    gstNumber: v.optional(v.string()),
+    panNumber: v.optional(v.string()),
+    website: v.optional(v.string()),
+    addressLine1: v.string(),
+    addressLine2: v.optional(v.string()),
+    city: v.string(),
+    state: v.optional(v.string()),
+    postalCode: v.optional(v.string()),
+    country: v.string(),
+
+    // Contact information
+    contactPersonName: v.string(),
+    contactEmail: v.string(),
+    contactPhone: v.string(),
+    alternatePhone: v.optional(v.string()),
+
+    // Lifecycle
+    status: partnerStatus,
+    statusReason: v.optional(v.string()),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    approvedAt: v.optional(v.number()),
+    suspendedAt: v.optional(v.number()),
+
+    /**
+     * Fallback markup applied to any product without its own pricing row.
+     * Percent of the base per-traveller fee. Admin-set, never partner-set.
+     */
+    defaultMarkupPercent: v.number(),
+
+    /** Internal-only note. Never returned to the partner's own queries. */
+    internalNote: v.optional(v.string()),
+
+    // Denormalised counters, maintained by the booking mutations.
+    bookingCount: v.number(),
+    customerCount: v.number(),
+    /** Lifetime sum of `partnerMargin.partnerPrice` on submitted bookings. */
+    grossVolume: v.number(),
+    /** Lifetime sum of `partnerMargin.marginAmount`. */
+    grossMargin: v.number(),
+    lastBookingAt: v.optional(v.number()),
+
+    /** Soft deletion — a removed partner keeps its bookings and audit trail. */
+    isDeleted: v.boolean(),
+    deletedAt: v.optional(v.number()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_partnerCode", ["partnerCode"])
+    .index("by_status", ["status"])
+    .index("by_status_createdAt", ["status", "createdAt"])
+    .index("by_contactEmail", ["contactEmail"])
+    .index("by_createdAt", ["createdAt"])
+    .searchIndex("search_partners", {
+      searchField: "agencyName",
+      filterFields: ["status", "businessType"],
+    }),
+
+  /* ---------------------------------------------------- partnerDocuments */
+  /**
+   * Business verification paperwork. Deliberately a separate table from
+   * `documents`, which is keyed to an application and carries a visa
+   * checklist's semantics; a GST certificate belongs to the business, not to
+   * any one booking. The file itself is still only reachable through an
+   * access-checked signed URL in `convex/documents.ts`.
+   */
+  partnerDocuments: defineTable({
+    partnerId: v.id("partners"),
+    /** The partner's login, so ownership is checkable without a join. */
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+
+    documentKind: v.string(), // see lib/constants/partners.ts
+    label: v.string(),
+    fileName: v.string(),
+    mimeType: v.string(),
+    size: v.number(),
+
+    status: partnerDocumentStatus,
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    reviewNote: v.optional(v.string()),
+
+    /** Replacements supersede rather than overwrite, as `documents` does. */
+    version: v.number(),
+    supersedesId: v.optional(v.id("partnerDocuments")),
+    isCurrent: v.boolean(),
+
+    createdAt: v.number(),
+  })
+    .index("by_partnerId", ["partnerId"])
+    .index("by_partner_current", ["partnerId", "isCurrent"])
+    .index("by_partner_kind", ["partnerId", "documentKind"])
+    .index("by_userId", ["userId"])
+    .index("by_status", ["status"]),
+
+  /* ------------------------------------------------------ partnerPricing */
+  /**
+   * One partner's price for one visa product.
+   *
+   * Absent means "trade at the partner's `defaultMarkupPercent`". The row
+   * stores the *rule*, never a resolved total: resolving it against the live
+   * catalogue happens server-side on every quote and every booking, so a
+   * catalogue fee change flows through without a backfill.
+   */
+  partnerPricing: defineTable({
+    partnerId: v.id("partners"),
+    visaProductId: v.id("visaProducts"),
+    /** Denormalised for the margin table, which lists by destination. */
+    destinationId: v.id("destinations"),
+
+    mode: partnerPricingMode,
+    /** Percent for `markup_percent`; paise per traveller otherwise. */
+    value: v.number(),
+
+    isActive: v.boolean(),
+    note: v.optional(v.string()),
+
+    setBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_partnerId", ["partnerId"])
+    .index("by_partner_product", ["partnerId", "visaProductId"])
+    .index("by_partner_active", ["partnerId", "isActive"])
+    .index("by_visaProductId", ["visaProductId"]),
+
+  /* ---------------------------------------------------- partnerCustomers */
+  /**
+   * The relationship between a partner and one of their travellers.
+   *
+   * A join table rather than a `partnerId` column on `users`, because a person
+   * may already hold a direct VisaDrive account: stamping the partner onto
+   * their user row would claim a customer who is not the partner's to claim.
+   * This row says only "this agency booked for this person", which is the true
+   * statement and the one the isolation checks need.
+   */
+  partnerCustomers: defineTable({
+    partnerId: v.id("partners"),
+    userId: v.id("users"),
+
+    // Denormalised so the partner's customer list needs no join.
+    fullName: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    /** The partner's own label for them, e.g. "Sharma family". */
+    reference: v.optional(v.string()),
+    notes: v.optional(v.string()),
+
+    bookingCount: v.number(),
+    lastBookingAt: v.optional(v.number()),
+
+    isArchived: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_partnerId", ["partnerId"])
+    .index("by_partner_user", ["partnerId", "userId"])
+    .index("by_partner_email", ["partnerId", "email"])
+    .index("by_partner_created", ["partnerId", "createdAt"])
+    .index("by_userId", ["userId"])
+    .searchIndex("search_partner_customers", {
+      searchField: "fullName",
+      filterFields: ["partnerId", "isArchived"],
+    }),
 
   /* ------------------------------------------------------------ enquiries */
   enquiries: defineTable({

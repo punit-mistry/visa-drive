@@ -20,6 +20,11 @@ import {
 import { AUDIT_ACTIONS, recordAudit } from "./lib/audit";
 import { generateReference } from "./lib/references";
 import { pricingForProduct } from "./applications";
+import {
+  marginSnapshot,
+  resolvePartnerQuote,
+} from "./lib/partners";
+import { partnerCanTrade } from "../lib/constants/partners";
 import { formatMoney } from "../lib/helpers/pricing";
 import { NOTIFICATION_TYPES, dedupeKeys } from "../lib/constants/notifications";
 import { PERMISSIONS } from "../lib/constants/roles";
@@ -308,7 +313,31 @@ export const prepareOrderInternal = internalMutation({
     // The authoritative amount. Not the client's, and not even the stored
     // snapshot — the catalogue row is re-read and the maths re-run here so a
     // tampered or stale snapshot cannot be charged.
-    const pricing = pricingForProduct(product, application.travellerCount, now);
+    //
+    // A B2B booking is priced at the *partner* price, because that is what the
+    // agent's customer agreed to pay. Re-running the base maths here would
+    // silently charge VisaDrive's base price and erase the partner's margin.
+    let pricing = pricingForProduct(product, application.travellerCount, now);
+    let partnerMargin: ReturnType<typeof marginSnapshot> | undefined;
+
+    if (application.partnerId) {
+      const partner = await ctx.db.get(application.partnerId);
+      if (!partner || partner.isDeleted || !partnerCanTrade(partner.status)) {
+        throw new ConvexError({
+          code: "PARTNER_NOT_APPROVED",
+          message: "This booking's partner account is not currently active.",
+        });
+      }
+      const quote = await resolvePartnerQuote(
+        ctx,
+        partner,
+        product,
+        application.travellerCount,
+        now,
+      );
+      pricing = quote.breakdown;
+      partnerMargin = marginSnapshot(quote);
+    }
 
     if (pricing.total <= 0) {
       throw new ConvexError({
@@ -320,7 +349,11 @@ export const prepareOrderInternal = internalMutation({
     if (pricing.total !== application.pricing.total) {
       // Keep the snapshot and the receipt in step, so what the customer is
       // charged is also what their invoice and the finance report show.
-      await ctx.db.patch(application._id, { pricing, updatedAt: now });
+      await ctx.db.patch(application._id, {
+        pricing,
+        ...(partnerMargin ? { partnerMargin } : {}),
+        updatedAt: now,
+      });
     }
 
     /* ---------------------------- payment row ----------------------------- */

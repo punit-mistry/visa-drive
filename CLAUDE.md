@@ -3,10 +3,11 @@
 A visa application and booking SaaS platform for VisaDrive (visadrive.in), a
 private visa consultancy in Khar West, Mumbai.
 
-Three surfaces, one Convex backend:
+Four surfaces, one Convex backend:
 - **Public website** — `app/(marketing)` — discovery, destinations, services.
 - **Customer portal** — `app/(customer)` — booking wizard, documents, payments, tracking.
-- **Admin CRM** — `app/admin` — applications, leads, catalogue, finance, support, staff.
+- **Partner portal** — `app/partner` — B2B agents booking for their own customers.
+- **Admin CRM** — `app/admin` — applications, leads, catalogue, finance, support, staff, partners.
 
 ## Stack
 
@@ -39,8 +40,10 @@ crashing.
    by `payments.markPaidInternal`, reached from a signature-verified Razorpay
    webhook or a permission-checked manual entry.
 3. **Documents are private.** `ctx.storage.getUrl` is called in exactly one
-   place — `documents.getSignedUrl` — and only after `requireDocumentAccess`
-   passes. Passport scans must never be reachable by URL alone.
+   module — `convex/documents.ts` — in two exports: `getSignedUrl` (after
+   `requireDocumentAccess`) for a traveller's files, and `getPartnerSignedUrl`
+   (after `requirePartnerDocumentAccess`) for a B2B partner's business
+   paperwork. Passport scans must never be reachable by URL alone.
 4. **Internal notes stay internal.** `messages.listByConversation` strips
    `isInternal` rows for customer callers.
 5. **No invented facts.** Visa fees, processing times, document requirements
@@ -51,11 +54,25 @@ crashing.
 6. **No dead buttons.** Every rendered control does something real.
 7. **Audit the consequential.** Status changes, money, permissions and
    customer-visible edits call `recordAudit`.
+8. **A partner reaches only their own.** Every function in
+   `convex/partnerBookings.ts` and `partnerPricing.myCatalogue` resolves the
+   partner from the session via `requirePartner` — a partner id never arrives
+   as an argument, so there is no parameter to tamper with. Partners have the
+   *applicant* side of a booking (fill in, upload, cancel before processing)
+   and never the office side: no status changes, no internal timeline.
 
 ## Money
 
 Integers in the smallest currency unit (paise) everywhere — storage, Razorpay
 calls, and arithmetic. Only `formatMoney()` converts for display. Never floats.
+
+On a **B2B booking**, `applications.pricing.total` is the *partner price* —
+what the agent's customer pays, and therefore what Razorpay is asked for.
+`applications.partnerMargin` carries the base price VisaDrive charges the
+partner and the margin between the two, frozen at submission so a later rate
+change never rewrites what was earned. The maths lives in
+`lib/helpers/partner-pricing.ts` and is resolved server-side by
+`convex/lib/partners.ts` on every write — a partner never supplies a price.
 
 ## Dates
 
@@ -85,7 +102,8 @@ VisaDrive logo: signal red `#D82828`, primary action `#C62222`, ink charcoal
 - Status colours come from `TONE_CLASSES` in `lib/constants/statuses.ts` via
   the badges in `components/shared/status-badge.tsx`. Do not hand-roll a badge.
 - Page gutters: `.container-page` (1200px) or `.container-wide` (1440px).
-- The portal and the CRM must look like two products from one design system.
+- The customer portal, the partner portal and the CRM must look like three
+  products from one design system.
 
 ## Structure
 
@@ -93,6 +111,7 @@ VisaDrive logo: signal red `#D82828`, primary action `#C62222`, ink charcoal
 app/(marketing)   public site          components/marketing
 app/(auth)        sign-in / sign-up    components/forms
 app/(customer)    portal + wizard      components/dashboard, components/application
+app/partner       B2B partner portal   components/partner
 app/admin         CRM                  components/admin, components/tables
 convex/           backend              components/ui (shadcn), components/shared
 lib/              constants, helpers, validators, payments, notifications
@@ -119,4 +138,6 @@ dialogs for destructive actions, inline form validation, autosaved drafts,
 unsaved-change protection, working search/filter/sort/pagination, keyboard
 navigable menus and dialogs, and visible focus rings (`.focus-brand`).
 
-Admin is desktop-first; the customer booking flow is mobile-first.
+Admin is desktop-first; the customer booking flow is mobile-first. The partner
+portal sits between the two — agents work at a desk but check status on a
+phone, so it is responsive throughout.

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, FileCheck2, Headset, ShieldCheck } from "lucide-react";
 import { useQuery } from "convex/react";
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 
 import { api } from "@/convex/_generated/api";
@@ -42,16 +42,16 @@ import { SITE } from "@/lib/constants/site";
  */
 
 /**
- * The opening frame: the Burj Al Arab from the air.
+ * The opening frame: the United States. It is the destination most of our
+ * applications are for, so the first thing a visitor sees is the one we do
+ * the most of.
  *
  * The water gives an even mid-tone across the lower half, which is where the
  * type and the search panel sit — a sunrise over cloud looks better in
- * isolation and then loses both in its own highlights. And the UAE is a
- * destination VisaDrive actually handles, so the first thing a visitor sees is
- * aspirational without being a place we cannot send them.
+ * isolation and then loses both in its own highlights.
  */
 const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1518684079-3c830dcef090?auto=format&fit=crop&w=1920&q=70";
+  "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=1920&q=70";
 
 /** Three promises the rest of the site has to keep, and does. */
 const ASSURANCES = [
@@ -64,9 +64,25 @@ export function Hero() {
   const reduceMotion = useReducedMotion();
   const sectionRef = useRef<HTMLElement>(null);
 
-  const destinations = useQuery(api.destinations.listPublished, { limit: 6 }) as
+  /**
+   * The United States leads the rail, because it is the bulk of the work
+   * that actually comes through the door — the hero should open on what we
+   * do most of, not on whatever sits first in the catalogue order.
+   *
+   * Fetched a little wider than the six shown so the US is still reachable
+   * when an admin has ordered it further down, then trimmed back to six.
+   */
+  const published = useQuery(api.destinations.listPublished, { limit: 10 }) as
     | PublishedDestination[]
     | undefined;
+
+  const destinations = useMemo(() => {
+    if (!published) return undefined;
+    const isUs = (d: PublishedDestination) => d.countryCode?.toUpperCase() === "US";
+    return [...published]
+      .sort((x, y) => Number(isUs(y)) - Number(isUs(x)))
+      .slice(0, 6);
+  }, [published]);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,

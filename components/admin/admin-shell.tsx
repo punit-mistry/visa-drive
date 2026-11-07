@@ -7,6 +7,7 @@ import { Show, UserButton } from "@clerk/nextjs";
 import {
   BarChart3,
   BookOpen,
+  Building2,
   ClipboardList,
   CreditCard,
   FileText,
@@ -63,6 +64,7 @@ const NAV_GROUPS = [
     label: "People",
     items: [
       { href: "/admin/customers", label: "Customers", icon: Users, permission: PERMISSIONS.CUSTOMER_VIEW },
+      { href: "/admin/partners", label: "B2B Partners", icon: Building2, permission: PERMISSIONS.PARTNER_VIEW },
       { href: "/admin/staff", label: "Staff", icon: ShieldCheck, permission: PERMISSIONS.STAFF_VIEW },
     ],
   },

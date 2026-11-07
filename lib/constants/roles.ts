@@ -10,6 +10,7 @@
 
 export const USER_ROLES = [
   "customer",
+  "partner",
   "support_agent",
   "visa_agent",
   "manager",
@@ -34,9 +35,25 @@ export function isStaffRole(role: string): role is StaffRole {
   return (STAFF_ROLES as readonly string[]).includes(role);
 }
 
+/**
+ * B2B partners are neither staff nor ordinary customers.
+ *
+ * They reach `/partner`, book on behalf of their own clients, and are
+ * authorised against the `partners` table — never against a staff profile.
+ * `isStaffRole("partner")` is deliberately false, so every existing CRM guard
+ * keeps refusing them without being touched.
+ */
+export function isPartnerRole(role: string): boolean {
+  return role === "partner";
+}
+
 /** Ordering used for "at least this role" comparisons. */
 export const ROLE_RANK: Record<UserRole, number> = {
   customer: 0,
+  // Partners sit outside the staff ladder entirely, so they rank alongside
+  // customers: every `roleAtLeast(role, "support_agent")` check in the CRM
+  // keeps refusing them without being rewritten.
+  partner: 0,
   support_agent: 10,
   visa_agent: 20,
   manager: 30,
@@ -50,6 +67,7 @@ export function roleAtLeast(role: UserRole, minimum: UserRole): boolean {
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   customer: "Customer",
+  partner: "B2B Partner",
   support_agent: "Support Agent",
   visa_agent: "Visa Processing Agent",
   manager: "Manager",
@@ -59,6 +77,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   customer: "Can book visas, upload documents and track their own applications.",
+  partner:
+    "Travel agent or agency. Books on behalf of their own customers at partner pricing.",
   support_agent: "Handles customer conversations and enquiries. Read-only on applications.",
   visa_agent: "Processes assigned applications, reviews documents and updates status.",
   manager: "Oversees all applications, assigns agents, manages the catalogue and reports.",
@@ -118,6 +138,13 @@ export const PERMISSIONS = {
   CONVERSATION_ASSIGN: "conversation:assign",
   CONVERSATION_INTERNAL_NOTE: "conversation:internal_note",
 
+  // B2B partners
+  PARTNER_VIEW: "partner:view",
+  PARTNER_MANAGE: "partner:manage",
+  PARTNER_APPROVE: "partner:approve",
+  PARTNER_PRICING: "partner:pricing",
+  PARTNER_EXPORT: "partner:export",
+
   // Staff & settings
   STAFF_VIEW: "staff:view",
   STAFF_MANAGE: "staff:manage",
@@ -145,6 +172,9 @@ const SUPPORT_AGENT_PERMISSIONS: Permission[] = [
   P.CONVERSATION_INTERNAL_NOTE,
   P.CATALOGUE_VIEW,
   P.DOCUMENT_VIEW,
+  // Reading the partner directory is part of answering "who booked this?" on
+  // the phone. Approving one, or changing what they pay, is not.
+  P.PARTNER_VIEW,
 ];
 
 const VISA_AGENT_PERMISSIONS: Permission[] = [
@@ -173,6 +203,8 @@ const MANAGER_PERMISSIONS: Permission[] = [
   P.CONVERSATION_ASSIGN,
   P.PAYMENT_RECORD,
   P.PAYMENT_EXPORT,
+  P.PARTNER_MANAGE,
+  P.PARTNER_EXPORT,
   P.STAFF_VIEW,
   P.SETTINGS_VIEW,
 ];
@@ -184,6 +216,10 @@ const ADMIN_PERMISSIONS: Permission[] = [
   P.CATALOGUE_DELETE,
   P.DOCUMENT_DELETE,
   P.PAYMENT_REFUND,
+  // Approving a partner grants them a login and a price list, so it sits with
+  // the roles that already manage money and permissions.
+  P.PARTNER_APPROVE,
+  P.PARTNER_PRICING,
   P.STAFF_MANAGE,
   P.SETTINGS_EDIT,
   P.AUDIT_LOG_VIEW,
@@ -197,6 +233,10 @@ const SUPER_ADMIN_PERMISSIONS: Permission[] = [
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   customer: [],
+  // A partner holds no CRM permission at all. Everything they may do is
+  // decided by `convex/lib/partners.ts` against their own `partners` row —
+  // which is also what scopes them to their own data.
+  partner: [],
   support_agent: dedupe(SUPPORT_AGENT_PERMISSIONS),
   visa_agent: dedupe(VISA_AGENT_PERMISSIONS),
   manager: dedupe(MANAGER_PERMISSIONS),
@@ -233,9 +273,20 @@ export function hasPermission(
   return resolvePermissions(role, extra, revoked).has(permission);
 }
 
-/** Roles a given role is allowed to grant. Prevents privilege escalation. */
+/**
+ * Roles a given role is allowed to grant. Prevents privilege escalation.
+ *
+ * `partner` is deliberately absent from every list, including a super admin's.
+ * Becoming a partner means having an approved row in the `partners` table, so
+ * the role is granted by `partners.setStatus` and revoked by the same call —
+ * `users.setRole` cannot be used to mint a partner with no partner record, and
+ * (because the target's own role must also be assignable) cannot be used to
+ * strip one out from under their account either.
+ */
 export function assignableRoles(actor: UserRole): UserRole[] {
-  if (actor === "super_admin") return [...USER_ROLES];
+  if (actor === "super_admin") {
+    return USER_ROLES.filter((role) => role !== "partner");
+  }
   if (actor === "admin") {
     return ["customer", "support_agent", "visa_agent", "manager"];
   }

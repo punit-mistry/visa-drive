@@ -6,6 +6,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import {
   authError,
+  getPartnerForUser,
   requireApplicationAccess,
   requireDocumentAccess,
   requirePermission,
@@ -13,6 +14,7 @@ import {
 } from "./lib/auth";
 import { AUDIT_ACTIONS, recordAudit } from "./lib/audit";
 import { fulfilDocumentRequest } from "./documentRequests";
+import { requirePartnerDocumentAccess } from "./partnerDocuments";
 import {
   ACCEPTED_MIME_TYPES,
   DOCUMENT_TYPE_MAP,
@@ -22,16 +24,20 @@ import {
 import { APPLICATION_STATUS_CONFIG } from "../lib/constants/statuses";
 import type { ApplicationStatus } from "../lib/constants/statuses";
 import { NOTIFICATION_TYPES, dedupeKeys } from "../lib/constants/notifications";
-import { PERMISSIONS } from "../lib/constants/roles";
+import { PERMISSIONS, isPartnerRole } from "../lib/constants/roles";
+import { partnerCanTrade } from "../lib/constants/partners";
 
 /* ============================================================================
  * Documents.
  *
  * Two rules drive everything in this file:
  *
- *  1. A storage URL is never public. `getSignedUrl` is the ONLY place in the
- *     whole codebase that calls `ctx.storage.getUrl`, and it runs after
- *     `requireDocumentAccess`. Passport scans and bank statements live here.
+ *  1. A storage URL is never public. This module is the ONLY one in the whole
+ *     codebase that calls `ctx.storage.getUrl`, in exactly two exports:
+ *     `getSignedUrl` (after `requireDocumentAccess`) for a traveller's files,
+ *     and `getPartnerSignedUrl` (after `requirePartnerDocumentAccess`) for a
+ *     B2B partner's business paperwork. Passport scans, bank statements and
+ *     GST certificates all live behind those two checks and nothing else.
  *  2. Files are never overwritten. A replacement supersedes the previous row
  *     (`isCurrent: false`, `version + 1`, `supersedesId`) so the audit trail
  *     keeps what the customer originally sent.
@@ -507,6 +513,30 @@ export const getSignedUrl = query({
   },
 });
 
+/**
+ * The same thing for a B2B partner's business paperwork.
+ *
+ * Partner verification documents live in their own table — a GST certificate
+ * belongs to a business, not to any one booking — but they must not acquire a
+ * second, looser way to reach storage. So the URL is minted here, beside the
+ * other one, and only after `requirePartnerDocumentAccess` passes: the partner
+ * the file belongs to, or staff holding `partner:view`.
+ *
+ * Keeping both calls in this module is what makes "where can a file URL come
+ * from?" a one-file answer.
+ */
+export const getPartnerSignedUrl = query({
+  args: { partnerDocumentId: v.id("partnerDocuments") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const { document } = await requirePartnerDocumentAccess(
+      ctx,
+      args.partnerDocumentId,
+    );
+    return await ctx.storage.getUrl(document.storageId);
+  },
+});
+
 /** Paginated review queue. */
 export const listForAdmin = query({
   args: {
@@ -672,10 +702,24 @@ export const remove = mutation({
     if (!application) authError("NOT_FOUND", "Application not found.");
 
     const isOwner = document.userId === user._id;
+
+    // The partner who placed a B2B booking gets the same self-service window
+    // as the traveller who owns a direct one: they are the applicant side,
+    // and a document filed into the wrong slot has to be fixable before the
+    // booking is submitted. Resolved from the session, never an argument.
+    const placingPartner =
+      !isOwner && isPartnerRole(user.role)
+        ? await getPartnerForUser(ctx, user._id)
+        : null;
+    const isPlacingPartner =
+      !!placingPartner &&
+      application.partnerId === placingPartner._id &&
+      partnerCanTrade(placingPartner.status);
+
     let actorIsStaff = false;
 
-    if (isOwner && application.isDraft) {
-      // Owner self-service, but only while nothing has been submitted.
+    if ((isOwner || isPlacingPartner) && application.isDraft) {
+      // Applicant-side self-service, but only while nothing is submitted.
     } else {
       // Anyone else (and the owner after submission) needs the delete grant.
       await requirePermission(ctx, PERMISSIONS.DOCUMENT_DELETE);

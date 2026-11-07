@@ -18,6 +18,15 @@ const isCustomerRoute = createRouteMatcher([
 
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 
+/**
+ * The B2B partner portal. Signed-in only, but *not* partner-only at this
+ * layer: `/partner/register` is where somebody becomes a partner in the first
+ * place, and `/partner/dashboard` is where a pending applicant is told their
+ * account is still being reviewed. Which of those they see is decided by
+ * Convex, which re-reads the real `partners` row on every call.
+ */
+const isPartnerRoute = createRouteMatcher(["/partner(.*)"]);
+
 /** Routes that must stay reachable while signed out. */
 const isPublicApiRoute = createRouteMatcher([
   "/api/webhooks(.*)",
@@ -33,6 +42,16 @@ export default clerkMiddleware(async (auth, req) => {
     // logged out. Send them to sign-in and back to where they were going.
     // The search string matters: /apply?product=<id> starts that application
     // on arrival, and dropping the query would land them on a bare catalogue.
+    const signIn = new URL("/sign-in", req.url);
+    signIn.searchParams.set(
+      "redirect_url",
+      req.nextUrl.pathname + req.nextUrl.search,
+    );
+    await auth.protect({ unauthenticatedUrl: signIn.toString() });
+    return NextResponse.next();
+  }
+
+  if (isPartnerRoute(req)) {
     const signIn = new URL("/sign-in", req.url);
     signIn.searchParams.set(
       "redirect_url",
@@ -95,9 +114,18 @@ export const config = {
     "/dashboard/:path*",
     "/apply/:path*",
     "/checkout/:path*",
+    "/partner/:path*",
     "/admin/:path*",
     "/sign-in/:path*",
     "/sign-up/:path*",
     "/api/admin/:path*",
+    // Clerk finishes a sign-in by redirecting back to the page the visitor came
+    // from with `__clerk_handshake` in the query string. Only that handshake
+    // hands the session cookies to the browser, so it must run on every page,
+    // including the public ones the matchers above leave out.
+    {
+      source: "/:path*",
+      has: [{ type: "query", key: "__clerk_handshake" }],
+    },
   ],
 };

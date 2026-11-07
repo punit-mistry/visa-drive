@@ -263,6 +263,11 @@ export const FOOTER_NAV = {
     { label: "How It Works", href: "/how-it-works" },
     { label: "Contact Us", href: "/contact" },
     { label: "Track Application", href: "/dashboard/applications" },
+    // The B2B front door. Agents arrive here from a colleague's word of
+    // mouth, so the link has to exist somewhere a visitor can find it —
+    // `/partner/register` asks them to sign in and then takes the
+    // registration.
+    { label: "Partner With Us", href: "/partner/register" },
   ],
   legal: [
     { label: "Privacy Policy", href: "/privacy" },

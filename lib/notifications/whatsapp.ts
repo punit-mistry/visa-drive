@@ -136,6 +136,15 @@ export interface WhatsAppData {
   agentName?: string;
   messagePreview?: string;
 
+  // B2B partners
+  agencyName?: string;
+  contactPersonName?: string;
+  partnerCode?: string;
+  partnerUrl?: string;
+  /** The traveller the partner booked for, as distinct from the partner. */
+  endCustomerName?: string;
+  marginFormatted?: string;
+
   title?: string;
   body?: string;
 
@@ -325,6 +334,130 @@ export function documentsReminderMessage(data: WhatsAppData): string {
   ]);
 }
 
+/* --------------------------------------------------------------------------
+ * B2B partners
+ *
+ * A partner is a business reading this on the same phone they use for their
+ * own customers, so these lead with the thing they have to act on and carry
+ * the end customer's name — an agent with forty live files cannot work out
+ * which booking "your application" means.
+ * ------------------------------------------------------------------------ */
+
+function partnerLink(data: WhatsAppData, fallbackPath: string): string {
+  const raw = data.partnerUrl ?? data.link;
+  if (raw && /^https?:\/\//i.test(String(raw))) return String(raw);
+  if (raw && String(raw).startsWith("/")) {
+    return `${SITE.url.replace(/\/$/, "")}${raw}`;
+  }
+  return `${SITE.url.replace(/\/$/, "")}${fallbackPath}`;
+}
+
+function travellerSuffix(data: WhatsAppData): string | null {
+  const name = data.endCustomerName ?? data.customerName;
+  return name ? `Customer: *${name}*` : null;
+}
+
+export function partnerApprovedMessage(data: WhatsAppData): string {
+  return compose([
+    `Hi ${firstName(data.recipientName ?? data.contactPersonName)}, your ${SITE.name} partner account${
+      data.agencyName ? ` for *${data.agencyName}*` : ""
+    } has been *approved*.`,
+    ...line(data.partnerCode ? `Partner ID: *${data.partnerCode}*` : null),
+    "",
+    "You can now create bookings for your customers at your partner pricing.",
+    "",
+    `Sign in: ${partnerLink(data, "/partner/dashboard")}`,
+    "",
+    SIGNATURE,
+  ]);
+}
+
+export function partnerRejectedMessage(data: WhatsAppData): string {
+  return compose([
+    `Hi ${firstName(data.recipientName ?? data.contactPersonName)}, we were not able to approve your ${SITE.name} partner application at this time.`,
+    ...line(data.reason ? `\nReason: ${data.reason}` : null),
+    "",
+    `If you think this is a mistake, call us on ${SITE.contact.phonePrimaryDisplay} and we will take another look.`,
+    "",
+    SIGNATURE,
+  ]);
+}
+
+export function partnerSuspendedMessage(data: WhatsAppData): string {
+  return compose([
+    `Hi ${firstName(data.recipientName ?? data.contactPersonName)}, your ${SITE.name} partner account has been *paused*, so new bookings are on hold.`,
+    ...line(data.reason ? `Reason: ${data.reason}` : null),
+    "",
+    `Existing applications carry on as normal. Call us on ${SITE.contact.phonePrimaryDisplay} to sort it out.`,
+    "",
+    SIGNATURE,
+  ]);
+}
+
+export function partnerBookingCreatedMessage(data: WhatsAppData): string {
+  const amount = money(data.amount, data.currency, data.amountFormatted);
+  return compose([
+    `Booking confirmed${data.destinationName ? ` for *${data.destinationName}*` : ""}.`,
+    travellerSuffix(data),
+    refSuffix(data),
+    ...line(amount ? `Booking value: *${amount}*` : null),
+    ...line(
+      data.marginFormatted ? `Your margin: *${data.marginFormatted}*` : null,
+    ),
+    "",
+    `Track it here: ${partnerLink(data, "/partner/bookings")}`,
+    "",
+    SIGNATURE,
+  ]);
+}
+
+export function partnerDocumentsRequestedMessage(data: WhatsAppData): string {
+  const list = Array.isArray(data.documentLabels)
+    ? data.documentLabels.filter(Boolean).slice(0, 8)
+    : data.documentLabel
+      ? [data.documentLabel]
+      : [];
+
+  return compose([
+    `We need more documents before we can continue with one of your bookings.`,
+    travellerSuffix(data),
+    refSuffix(data),
+    ...(list.length ? ["", ...list.map((item) => `• ${item}`)] : []),
+    ...line(data.reason ? `\nNote: ${data.reason}` : null),
+    "",
+    `Upload them here: ${partnerLink(data, "/partner/bookings")}`,
+    "",
+    SIGNATURE,
+  ]);
+}
+
+export function partnerBookingStatusChangedMessage(data: WhatsAppData): string {
+  return compose([
+    `Update on one of your bookings.`,
+    "",
+    `Status: *${data.statusLabel ?? "Updated"}*`,
+    travellerSuffix(data),
+    refSuffix(data),
+    ...line(data.statusNote ? `\n${data.statusNote}` : null),
+    "",
+    `Full timeline: ${partnerLink(data, "/partner/bookings")}`,
+    "",
+    SIGNATURE,
+  ]);
+}
+
+export function partnerBookingCompletedMessage(data: WhatsAppData): string {
+  return compose([
+    `One of your bookings is now *complete*.`,
+    travellerSuffix(data),
+    refSuffix(data),
+    "",
+    `Any final documents are in your partner portal: ${partnerLink(data, "/partner/bookings")}`,
+    "",
+    SIGNATURE,
+  ]);
+}
+
 /**
  * Fallback: render the notification's own title and body. Used for any type
  * without a bespoke builder, so a new notification type still sends something
@@ -357,6 +490,14 @@ export const WHATSAPP_BUILDERS: Record<string, (data: WhatsAppData) => string> =
   "application.final_document_ready": finalDocumentReadyMessage,
   "conversation.admin_replied": adminRepliedMessage,
   "application.documents_reminder": documentsReminderMessage,
+
+  "partner.approved": partnerApprovedMessage,
+  "partner.rejected": partnerRejectedMessage,
+  "partner.suspended": partnerSuspendedMessage,
+  "partner.booking_created": partnerBookingCreatedMessage,
+  "partner.documents_requested": partnerDocumentsRequestedMessage,
+  "partner.booking_status_changed": partnerBookingStatusChangedMessage,
+  "partner.booking_completed": partnerBookingCompletedMessage,
 };
 
 /**
@@ -373,6 +514,14 @@ export const WHATSAPP_TEMPLATE_HINTS: Record<string, string> = {
   "application.status_changed": "visadrive_status_update",
   "application.completed": "visadrive_application_complete",
   "application.final_document_ready": "visadrive_document_ready",
+
+  "partner.approved": "visadrive_partner_approved",
+  "partner.rejected": "visadrive_partner_rejected",
+  "partner.suspended": "visadrive_partner_suspended",
+  "partner.booking_created": "visadrive_partner_booking_created",
+  "partner.documents_requested": "visadrive_partner_documents_requested",
+  "partner.booking_status_changed": "visadrive_partner_status_update",
+  "partner.booking_completed": "visadrive_partner_booking_complete",
 };
 
 /**

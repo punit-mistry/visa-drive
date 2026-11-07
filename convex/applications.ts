@@ -13,6 +13,7 @@ import { applicationStatus, paymentStatus } from "./schema";
 import {
   authError,
   requireApplicationAccess,
+  requireBookingEditor,
   requirePermission,
   requireUser,
 } from "./lib/auth";
@@ -24,6 +25,13 @@ import {
   recountApplicationDocuments,
 } from "./documents";
 import { computePricing, type PriceBreakdown } from "../lib/helpers/pricing";
+import {
+  marginSnapshot,
+  notifyPartnerOfApplicationEvent,
+  onPartnerBookingSubmitted,
+  recountPartner,
+  resolvePartnerQuote,
+} from "./lib/partners";
 import {
   ALLOWED_TRANSITIONS,
   APPLICATION_STATUS_CONFIG,
@@ -265,15 +273,12 @@ export const saveDraftStep = mutation({
   },
   returns: v.object({ savedAt: v.number() }),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const application = await ctx.db.get(args.applicationId);
-    if (!application) authError("NOT_FOUND", "Application not found.");
+    // Autosave belongs to the applicant side — the customer whose booking it
+    // is, or the partner who placed it. Deliberately not staff: the CRM has
+    // its own audited `updateTripDetails`, and autosaving over a half-typed
+    // form from the office is the bug that rule avoids.
+    const { application } = await requireBookingEditor(ctx, args.applicationId);
 
-    // Autosave is owner-only: staff editing a customer's half-finished wizard
-    // would silently overwrite what the customer is typing.
-    if (application.userId !== user._id) {
-      authError("FORBIDDEN", "You do not have access to this application.");
-    }
     if (!application.isDraft) {
       throw new ConvexError({
         code: "NOT_A_DRAFT",
@@ -315,12 +320,7 @@ export const saveDraftStep = mutation({
 export const getDraft = query({
   args: { applicationId: v.id("applications") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const application = await ctx.db.get(args.applicationId);
-    if (!application) authError("NOT_FOUND", "Application not found.");
-    if (application.userId !== user._id) {
-      authError("FORBIDDEN", "You do not have access to this application.");
-    }
+    const { application } = await requireBookingEditor(ctx, args.applicationId);
 
     const [applicants, documents, product, requirements, destination] =
       await Promise.all([
@@ -420,12 +420,8 @@ export const submit = mutation({
     total: v.number(),
   }),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const application = await ctx.db.get(args.applicationId);
-    if (!application) authError("NOT_FOUND", "Application not found.");
-    if (application.userId !== user._id) {
-      authError("FORBIDDEN", "You do not have access to this application.");
-    }
+    const editor = await requireBookingEditor(ctx, args.applicationId);
+    const { user, application } = editor;
 
     // Idempotent-ish: a double-clicked submit button returns the same answer
     // rather than throwing or writing a second statusHistory row.
@@ -521,7 +517,26 @@ export const submit = mutation({
 
     /* ------------------------------- freeze -------------------------------- */
 
-    const pricing = pricingForProduct(product, applicants.length, now);
+    // Both branches recompute from the catalogue row. A partner booking's
+    // total is its *partner* price — what the agent's customer pays, and what
+    // Razorpay will be asked for — with the base and the margin kept beside
+    // it so a later rate change never rewrites what was earned here.
+    let pricing: PriceBreakdown;
+    let partnerMargin = application.partnerMargin;
+
+    if (editor.viaPartner && editor.partner) {
+      const quote = await resolvePartnerQuote(
+        ctx,
+        editor.partner,
+        product,
+        applicants.length,
+        now,
+      );
+      pricing = quote.breakdown;
+      partnerMargin = marginSnapshot(quote);
+    } else {
+      pricing = pricingForProduct(product, applicants.length, now);
+    }
 
     // Payment status at submission is a function of how the product is sold —
     // never of anything the client sent. `pay_after_confirmation` and
@@ -536,6 +551,7 @@ export const submit = mutation({
       status: "submitted",
       paymentStatus: nextPaymentStatus,
       pricing,
+      ...(partnerMargin ? { partnerMargin } : {}),
       travellerCount: applicants.length,
       isDraft: false,
       currentStep: Math.max(application.currentStep, 5),
@@ -548,23 +564,34 @@ export const submit = mutation({
 
     await writeStatusHistory(ctx, submitted, "submitted", {
       fromStatus: "draft",
-      note: "Application submitted by the customer.",
+      note: editor.viaPartner
+        ? `Application submitted by ${editor.partner?.agencyName ?? "a VisaDrive partner"}.`
+        : "Application submitted by the customer.",
       visibleToCustomer: true,
       changedBy: user,
     });
 
     await recountApplicationDocuments(ctx, application._id);
 
-    // Denormalised counter on the user row powers the customer list screen.
-    await ctx.db.patch(user._id, {
-      applicationCount: (user.applicationCount ?? 0) + 1,
-      lastActiveAt: now,
-    });
+    // Denormalised counter on the *owner's* row — the traveller's — which is
+    // what the customer list screen counts. On a partner booking the caller
+    // and the owner are different people, so this cannot use `user`.
+    const owner = await ctx.db.get(submitted.userId);
+    if (owner) {
+      await ctx.db.patch(owner._id, {
+        applicationCount: (owner.applicationCount ?? 0) + 1,
+        lastActiveAt: now,
+      });
+    }
+
+    // Partner-side bookkeeping and the agent's own copy of the confirmation.
+    // A no-op on a direct booking, because `partnerId` is unset.
+    await onPartnerBookingSubmitted(ctx, submitted);
 
     /* ----------------------------- notifications --------------------------- */
 
     await ctx.scheduler.runAfter(0, internal.notifications.dispatch, {
-      userId: user._id,
+      userId: submitted.userId,
       type: NOTIFICATION_TYPES.BOOKING_SUBMITTED,
       title: `Application ${submitted.referenceId} received`,
       body: `We have your ${submitted.visaProductName} application for ${submitted.destinationName}. Our team will review it shortly.`,
@@ -726,12 +753,10 @@ export const cancelMine = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const application = await ctx.db.get(args.applicationId);
-    if (!application) authError("NOT_FOUND", "Application not found.");
-    if (application.userId !== user._id) {
-      authError("FORBIDDEN", "You do not have access to this application.");
-    }
+    // The applicant side may walk away: the traveller, or the agent who
+    // booked on their behalf. Both are cancelling their own booking.
+    const editor = await requireBookingEditor(ctx, args.applicationId);
+    const { user, application } = editor;
 
     const from = application.status as ApplicationStatus;
     if (!CUSTOMER_CANCELLABLE.includes(from) || !canTransition(from, "cancelled")) {
@@ -762,10 +787,17 @@ export const cancelMine = mutation({
       action: AUDIT_ACTIONS.APPLICATION_CANCELLED,
       entityType: "application",
       entityId: application._id,
-      summary: `${user.fullName} cancelled ${application.referenceId}`,
+      summary: `${
+        editor.viaPartner ? (editor.partner?.agencyName ?? user.fullName) : user.fullName
+      } cancelled ${application.referenceId}`,
       before: { status: from },
       after: { status: "cancelled", reason: args.reason },
     });
+
+    // A cancelled partner booking stops counting towards their volume.
+    if (application.partnerId) {
+      await recountPartner(ctx, application.partnerId);
+    }
 
     return null;
   },
@@ -1103,6 +1135,27 @@ async function applyStatusChange(
       dedupeKey: dedupeKeys.applicationStatus(application._id, to),
       applicationId: application._id,
     });
+
+    // The agent who placed a B2B booking gets their own copy, under its own
+    // dedupe key — they are the one the traveller will phone. A no-op on a
+    // direct booking, where `partnerId` is unset.
+    await notifyPartnerOfApplicationEvent(ctx, application, {
+      type:
+        to === "completed"
+          ? NOTIFICATION_TYPES.PARTNER_BOOKING_COMPLETED
+          : NOTIFICATION_TYPES.PARTNER_BOOKING_STATUS_CHANGED,
+      title: `${application.referenceId}: ${config.label}`,
+      body: `${application.customerName} — ${args.note?.trim() || config.description}`,
+      dedupeKey: dedupeKeys.partnerBookingStatus(application._id, to),
+      statusLabel: config.label,
+      reason: args.note?.trim(),
+    });
+  }
+
+  // Volume and margin exclude cancelled bookings, so a cancellation from the
+  // CRM has to move the partner's counters too.
+  if (application.partnerId && (to === "cancelled" || to === "completed")) {
+    await recountPartner(ctx, application.partnerId);
   }
 }
 
