@@ -24,6 +24,7 @@ import {
   canTransitionPartner,
   type PartnerStatus,
 } from "@/lib/constants/partners";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * The approve / reject / suspend controls on a partner's profile.
@@ -151,7 +152,7 @@ export function PartnerStatusActions({
       );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not update the partner.",
+        friendlyError(error, "Could not update the partner."),
       );
     } finally {
       setPending(null);

@@ -28,6 +28,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { formatProcessingTime, formatMoney } from "@/lib/helpers/pricing";
 import { titleCase } from "@/lib/helpers/format";
 import { cn } from "@/lib/utils";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Visa selection — step zero of the booking journey.
@@ -142,9 +143,7 @@ function ApplyCatalogue() {
         setAutoStartFailed(true);
         router.replace("/apply");
         toast.error(
-          error instanceof Error
-            ? error.message
-            : "That visa service is not available. Please choose another.",
+          friendlyError(error, "That visa service is not available. Please choose another."),
         );
       }
     })();
@@ -211,7 +210,7 @@ function ApplyCatalogue() {
       router.push(`/apply/${result.applicationId}`);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not start this application.",
+        friendlyError(error, "Could not start this application."),
       );
     } finally {
       setStartingId(null);

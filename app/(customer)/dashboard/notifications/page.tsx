@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState, ListSkeleton } from "@/components/shared/states";
 import { formatRelative } from "@/lib/helpers/format";
 import { cn } from "@/lib/utils";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 export default function NotificationsPage() {
   const notifications = useQuery(api.notifications.listMine, { limit: 100 });
@@ -29,7 +30,7 @@ export default function NotificationsPage() {
       const result = await markAllRead({});
       toast.success(`Marked ${result.marked} notification${result.marked === 1 ? "" : "s"} as read.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update notifications.");
+      toast.error(friendlyError(error, "Could not update notifications."));
     } finally {
       setMarking(false);
     }
@@ -39,7 +40,7 @@ export default function NotificationsPage() {
     try {
       await markRead({ notificationId });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update the notification.");
+      toast.error(friendlyError(error, "Could not update the notification."));
     }
   }
 

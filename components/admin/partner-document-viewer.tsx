@@ -18,9 +18,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { PartnerDocumentStatusBadge } from "@/components/shared/status-badge";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
+import { FieldError } from "@/components/shared/form-field";
 import { formatDateTime } from "@/lib/helpers/format";
 import { PERMISSIONS } from "@/lib/constants/roles";
 import type { PartnerDocumentStatus } from "@/lib/constants/partners";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Review a partner's business paperwork in place.
@@ -72,6 +75,15 @@ export function PartnerDocumentViewer({
 
   const document = documents.find((d) => d._id === openId) ?? null;
 
+  // Only a rejection needs a note, so only Reject runs the check.
+  const noteValidation = useValidation(
+    (): FieldErrors =>
+      note.trim().length < 3
+        ? { "partner-review-note": "Say why it was rejected — the partner is shown this." }
+        : {},
+    openId ?? "none",
+  );
+
   const ready = document && resolved?.id === document._id ? resolved : null;
   const loading = document !== null && ready === null;
   const url = ready?.url ?? null;
@@ -110,9 +122,7 @@ export function PartnerDocumentViewer({
         setResolved({
           id: partnerDocumentId,
           error:
-            error instanceof Error
-              ? error.message
-              : "Could not open this document.",
+            friendlyError(error, "Could not open this document."),
         });
       });
 
@@ -123,10 +133,7 @@ export function PartnerDocumentViewer({
 
   async function decide(status: PartnerDocumentStatus) {
     if (!document) return;
-    if (status === "rejected" && note.trim().length < 3) {
-      toast.error("Say why it was rejected — the partner is shown this.");
-      return;
-    }
+    if (status === "rejected" && !noteValidation.check()) return;
 
     setSaving(status);
     try {
@@ -143,7 +150,7 @@ export function PartnerDocumentViewer({
       onOpenChange(null);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save the verdict.",
+        friendlyError(error, "Could not save the verdict."),
       );
     } finally {
       setSaving(null);
@@ -233,11 +240,22 @@ export function PartnerDocumentViewer({
         {canReview && document && (
           <div className="space-y-3">
             <Textarea
+              id="partner-review-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               placeholder="Note for the partner — required when rejecting."
               aria-label="Review note"
+              aria-invalid={noteValidation.errors["partner-review-note"] ? true : undefined}
+              aria-describedby={
+                noteValidation.errors["partner-review-note"]
+                  ? "partner-review-note-error"
+                  : undefined
+              }
+            />
+            <FieldError
+              id="partner-review-note"
+              message={noteValidation.errors["partner-review-note"]}
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
               {url && (

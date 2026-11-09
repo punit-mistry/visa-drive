@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import {
@@ -37,9 +37,12 @@ import { ApplicationStatusBadge } from "@/components/shared/status-badge";
 import { EmptyState, ListSkeleton } from "@/components/shared/states";
 import { CursorPagination } from "@/components/tables/data-table";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useValidation, zodMessage, type FieldErrors } from "@/hooks/use-validation";
+import { emailField, phoneField } from "@/lib/validators/forms";
 import { formatDate, formatPhone, formatRelative } from "@/lib/helpers/format";
 import { formatMoney } from "@/lib/helpers/pricing";
 import type { ApplicationStatus } from "@/lib/constants/statuses";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 type PartnerCustomer = Doc<"partnerCustomers">;
 
@@ -249,7 +252,7 @@ function ArchiveButton({ customer }: { customer: PartnerCustomer }) {
           );
         } catch (error) {
           toast.error(
-            error instanceof Error ? error.message : "Could not update the customer.",
+            friendlyError(error, "Could not update the customer."),
           );
         } finally {
           setBusy(false);
@@ -298,15 +301,23 @@ function CustomerDialog({
     setNotes(existing?.notes ?? "");
   }
 
-  async function save() {
+  const validate = useCallback((): FieldErrors => {
+    const errors: FieldErrors = {};
     if (fullName.trim().length < 2) {
-      toast.error("Enter the customer's name.");
-      return;
+      errors["customer-name"] = "Enter the customer's name.";
     }
-    if (!email.trim().includes("@")) {
-      toast.error("Enter a valid email address.");
-      return;
+    const emailError = zodMessage(emailField, email);
+    if (emailError) errors["customer-email"] = emailError;
+    if (phone.trim()) {
+      const phoneError = zodMessage(phoneField, phone);
+      if (phoneError) errors["customer-phone"] = phoneError;
     }
+    return errors;
+  }, [fullName, email, phone]);
+  const { errors, check } = useValidation(validate, currentKey ?? "closed");
+
+  async function save() {
+    if (!check()) return;
 
     setBusy(true);
     try {
@@ -322,7 +333,7 @@ function CustomerDialog({
       onOpenChange(false);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save the customer.",
+        friendlyError(error, "Could not save the customer."),
       );
     } finally {
       setBusy(false);
@@ -343,7 +354,13 @@ function CustomerDialog({
 
         <div className="space-y-5 py-2">
           <FieldGrid>
-            <Field label="Full name" required htmlFor="customer-name" className="sm:col-span-2">
+            <Field
+              label="Full name"
+              required
+              htmlFor="customer-name"
+              className="sm:col-span-2"
+              error={errors["customer-name"]}
+            >
               <Input
                 id="customer-name"
                 value={fullName}
@@ -353,7 +370,7 @@ function CustomerDialog({
               />
             </Field>
 
-            <Field label="Email" required htmlFor="customer-email">
+            <Field label="Email" required htmlFor="customer-email" error={errors["customer-email"]}>
               <Input
                 id="customer-email"
                 type="email"
@@ -364,7 +381,7 @@ function CustomerDialog({
               />
             </Field>
 
-            <Field label="Phone" htmlFor="customer-phone">
+            <Field label="Phone" htmlFor="customer-phone" error={errors["customer-phone"]}>
               <PhoneField
                 id="customer-phone"
                 value={phone}

@@ -30,6 +30,7 @@ import { DetailSkeleton, ErrorState } from "@/components/shared/states";
 import { openRazorpayCheckout } from "@/lib/payments/razorpay";
 import { formatMoney } from "@/lib/helpers/pricing";
 import { formatDate } from "@/lib/helpers/format";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Checkout.
@@ -153,27 +154,33 @@ export default function CheckoutPage() {
       }
 
       if (outcome.status === "failed") {
-        toast.error(
-          outcome.error.description ||
-            "The payment did not go through. No money has been taken.",
-        );
+        toast.error("The payment did not go through. No money has been taken.");
         return;
       }
 
-      const verification = await verifyPayment({
-        razorpayOrderId: outcome.response.razorpay_order_id,
-        razorpayPaymentId: outcome.response.razorpay_payment_id,
-        razorpaySignature: outcome.response.razorpay_signature,
-      });
+      // Razorpay has said the payment went through, so a failure from here on
+      // must never read as "the payment failed" or invite a second attempt.
+      const notConfirmed =
+        "We could not confirm this payment yet. If money has left your account, contact support with your reference number.";
+      let verified = false;
+      try {
+        const verification = await verifyPayment({
+          razorpayOrderId: outcome.response.razorpay_order_id,
+          razorpayPaymentId: outcome.response.razorpay_payment_id,
+          razorpaySignature: outcome.response.razorpay_signature,
+        });
+        verified = verification.verified;
+      } catch {
+        toast.error(notConfirmed);
+        return;
+      }
 
-      if (verification.verified) {
+      if (verified) {
         setPaid(true);
         toast.success("Payment received. Your application is now being processed.");
         router.push(`/dashboard/applications/${applicationId}`);
       } else {
-        toast.error(
-          "We could not confirm this payment yet. If money has left your account, contact support with your reference number.",
-        );
+        toast.error(notConfirmed);
       }
     } catch (error) {
       if (errorCode(error) === "PAYMENT_NOT_CONFIGURED") {
@@ -181,9 +188,7 @@ export default function CheckoutPage() {
         toast.info("Online payment is not available right now.");
       } else {
         toast.error(
-          error instanceof Error
-            ? error.message
-            : "Could not start the payment. Please try again.",
+          friendlyError(error, "Could not start the payment. Please try again."),
         );
       }
     } finally {

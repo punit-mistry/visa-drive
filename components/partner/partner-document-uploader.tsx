@@ -26,6 +26,7 @@ import {
   PARTNER_DOCUMENT_DEFINITIONS,
   type PartnerDocumentStatus,
 } from "@/lib/constants/partners";
+import { friendlyError, UserFacingError } from "@/lib/helpers/error-messages";
 
 /**
  * The partner's verification checklist.
@@ -68,7 +69,7 @@ export function PartnerDocumentUploader({
           body: file,
         });
         if (!response.ok) {
-          throw new Error(`Upload failed (${response.status}).`);
+          throw new UserFacingError("The upload did not go through. Please try again.");
         }
         const { storageId } = (await response.json()) as { storageId: string };
 
@@ -86,7 +87,7 @@ export function PartnerDocumentUploader({
         });
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : "Could not upload the file.",
+          friendlyError(error, "Could not upload the file."),
         );
       } finally {
         setUploading(null);
@@ -108,7 +109,7 @@ export function PartnerDocumentUploader({
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not open the file.",
+        friendlyError(error, "Could not open the file."),
       );
     } finally {
       setOpening(null);
@@ -197,9 +198,7 @@ export function PartnerDocumentUploader({
                           toast.success(`${definition.label} removed.`);
                         } catch (error) {
                           toast.error(
-                            error instanceof Error
-                              ? error.message
-                              : "Could not remove the file.",
+                            friendlyError(error, "Could not remove the file."),
                           );
                         }
                       }}

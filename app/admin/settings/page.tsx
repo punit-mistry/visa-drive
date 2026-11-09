@@ -15,8 +15,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
 import { DetailSkeleton } from "@/components/shared/states";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
+import { FieldError } from "@/components/shared/form-field";
 import { PERMISSIONS } from "@/lib/constants/roles";
 import { titleCase } from "@/lib/helpers/format";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 type SettingRow = {
   key: string;
@@ -44,7 +47,9 @@ function toDraft(value: unknown): DraftValue {
 }
 
 function fromDraft(value: unknown, draft: DraftValue): unknown {
-  if (typeof value === "boolean" || typeof value === "number") return draft;
+  if (typeof value === "boolean") return draft;
+  // Numbers are held as the raw text while editing and parsed only on save.
+  if (typeof value === "number") return typeof draft === "string" ? Number(draft) : draft;
   if (typeof value === "string" && !isJsonKind(value)) return draft;
   if (value === null) return JSON.parse(String(draft));
   if (isJsonKind(value)) return JSON.parse(String(draft));
@@ -95,8 +100,34 @@ function SettingsEditor({
       .map((setting) => setting.key);
   }, [settings, draft]);
 
+  // Only what is about to be saved is checked: a number that is not a number,
+  // JSON that does not parse. Keys are the control ids, in page order.
+  const { errors, check } = useValidation((): FieldErrors => {
+    const found: FieldErrors = {};
+    for (const [, rows] of groups) {
+      for (const setting of rows) {
+        if (!changed.includes(setting.key)) continue;
+        const current = draft[setting.key];
+        if (
+          typeof setting.value === "number" &&
+          (String(current).trim() === "" || !Number.isFinite(Number(current)))
+        ) {
+          found[`setting-${setting.key}`] = "Enter a valid number.";
+        } else if (isJsonKind(setting.value) || setting.value === null) {
+          try {
+            JSON.parse(String(current));
+          } catch {
+            found[`setting-${setting.key}`] = "Enter valid JSON.";
+          }
+        }
+      }
+    }
+    return found;
+  });
+
   async function save() {
     if (changed.length === 0) return;
+    if (!check()) return;
     setSaving(true);
 
     try {
@@ -114,9 +145,7 @@ function SettingsEditor({
       );
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not save settings. Check that object values are valid JSON.",
+        friendlyError(error, "Could not save settings. Check that object values are valid JSON."),
       );
     } finally {
       setSaving(false);
@@ -227,6 +256,12 @@ function SettingsEditor({
                           id={`setting-${setting.key}`}
                           value={String(value ?? "")}
                           disabled={!canEdit}
+                          aria-invalid={errors[`setting-${setting.key}`] ? true : undefined}
+                          aria-describedby={
+                            errors[`setting-${setting.key}`]
+                              ? `setting-${setting.key}-error`
+                              : undefined
+                          }
                           rows={4}
                           spellCheck={false}
                           className="font-mono text-xs"
@@ -243,17 +278,25 @@ function SettingsEditor({
                           type={kind === "number" ? "number" : "text"}
                           value={String(value ?? "")}
                           disabled={!canEdit}
+                          aria-invalid={errors[`setting-${setting.key}`] ? true : undefined}
+                          aria-describedby={
+                            errors[`setting-${setting.key}`]
+                              ? `setting-${setting.key}-error`
+                              : undefined
+                          }
                           onChange={(event) =>
                             setDraft((current) => ({
                               ...current,
-                              [setting.key]:
-                                kind === "number"
-                                  ? Number(event.target.value)
-                                  : event.target.value,
+                              [setting.key]: event.target.value,
                             }))
                           }
                         />
                       )}
+
+                      <FieldError
+                        id={`setting-${setting.key}`}
+                        message={errors[`setting-${setting.key}`]}
+                      />
 
                       {setting.description && (
                         <p className="text-xs text-muted-foreground">

@@ -114,17 +114,29 @@ export function Field({
 
   // Clone a single element child so the label, the error wiring and the
   // invalid state attach without every call site repeating them.
-  const control =
-    !htmlFor && React.isValidElement(children)
-      ? React.cloneElement(
-          children as React.ReactElement<Record<string, unknown>>,
-          {
-            id,
-            "aria-describedby": describedBy,
-            ...(error ? { "aria-invalid": true } : {}),
-          },
-        )
-      : children;
+  // Wire the control only when it is plainly the labelled one: no explicit
+  // `htmlFor`, or a child that carries that very id. A wrapper div around an
+  // input is left alone, and a describedby the child already has is kept.
+  const child = React.isValidElement(children)
+    ? (children as React.ReactElement<Record<string, unknown>>)
+    : null;
+  const isControl =
+    child !== null &&
+    child.type !== React.Fragment &&
+    (!htmlFor || child.props.id === htmlFor);
+  const control = isControl
+    ? React.cloneElement(child, {
+        ...(htmlFor ? {} : { id }),
+        ...(describedBy
+          ? {
+              "aria-describedby": [child.props["aria-describedby"], describedBy]
+                .filter(Boolean)
+                .join(" "),
+            }
+          : {}),
+        ...(error ? { "aria-invalid": true } : {}),
+      })
+    : children;
 
   return (
     <div className={cn("space-y-1.5", className)}>
@@ -147,5 +159,16 @@ export function Field({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** Inline error for controls that are not wrapped in `Field` (a bare select,
+ *  a checkbox row). Point the control's `aria-describedby` at `${id}-error`. */
+export function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
+      {message}
+    </p>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useMutation } from "convex/react";
 import { Loader2, Pencil, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +23,10 @@ import { CountrySelect } from "@/components/shared/country-select";
 import { DateField } from "@/components/shared/date-field";
 import { Field, FieldGrid } from "@/components/shared/form-field";
 import { PhoneField } from "@/components/shared/phone-field";
+import { useValidation, zodMessage, type FieldErrors } from "@/hooks/use-validation";
 import { fromDateInput, toDateInput } from "@/lib/helpers/format";
+import { emailField, passportField, phoneField } from "@/lib/validators/forms";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Add or correct a traveller on a booking from the CRM.
@@ -88,11 +91,47 @@ export function EditTravellerDialog({
     setPassportIssuingCountry(applicant?.passportIssuingCountry ?? "");
     setIsPrimary(applicant?.isPrimary ?? false);
     setError(null);
+    resetValidation();
   }
+
+  const validate = useCallback((): FieldErrors => {
+    const errors: FieldErrors = {};
+    if (!firstName.trim()) errors["traveller-first"] = "Enter the first name.";
+    if (!lastName.trim()) errors["traveller-last"] = "Enter the last name.";
+    if (passportNumber.trim()) {
+      const message = zodMessage(passportField, passportNumber);
+      if (message) errors["traveller-passport"] = message;
+    }
+    const issued = fromDateInput(passportIssueDate);
+    const expires = fromDateInput(passportExpiryDate);
+    if (issued !== undefined && expires !== undefined && expires <= issued) {
+      errors["traveller-passport-expiry"] =
+        "Passport expiry must be after the issue date.";
+    }
+    if (email.trim()) {
+      const message = zodMessage(emailField, email);
+      if (message) errors["traveller-email"] = message;
+    }
+    if (phone.trim()) {
+      const message = zodMessage(phoneField, phone);
+      if (message) errors["traveller-phone"] = message;
+    }
+    return errors;
+  }, [
+    firstName,
+    lastName,
+    passportNumber,
+    passportIssueDate,
+    passportExpiryDate,
+    email,
+    phone,
+  ]);
+  const { errors, check, reset: resetValidation } = useValidation(validate);
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (saving) return;
+    if (!check()) return;
 
     setSaving(true);
     setError(null);
@@ -121,7 +160,7 @@ export function EditTravellerDialog({
       setOpen(false);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not save this traveller.",
+        friendlyError(caught, "Could not save this traveller."),
       );
     } finally {
       setSaving(false);
@@ -137,7 +176,7 @@ export function EditTravellerDialog({
       setOpen(false);
     } catch (caught) {
       toast.error(
-        caught instanceof Error ? caught.message : "Could not remove this traveller.",
+        friendlyError(caught, "Could not remove this traveller."),
       );
     } finally {
       setRemoving(false);
@@ -167,7 +206,7 @@ export function EditTravellerDialog({
       </DialogTrigger>
 
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <form onSubmit={save}>
+        <form onSubmit={save} noValidate>
           <DialogHeader>
             <DialogTitle>
               {applicant ? "Edit traveller" : "Add a traveller"}
@@ -180,11 +219,16 @@ export function EditTravellerDialog({
 
           <div className="space-y-5 py-4">
             <FieldGrid columns={3}>
-              <Field label="First name" required>
+              <Field
+                label="First name"
+                required
+                htmlFor="traveller-first"
+                error={errors["traveller-first"]}
+              >
                 <Input
+                  id="traveller-first"
                   value={firstName}
                   onChange={(event) => setFirstName(event.target.value)}
-                  required
                 />
               </Field>
               <Field label="Middle name">
@@ -193,11 +237,16 @@ export function EditTravellerDialog({
                   onChange={(event) => setMiddleName(event.target.value)}
                 />
               </Field>
-              <Field label="Last name" required>
+              <Field
+                label="Last name"
+                required
+                htmlFor="traveller-last"
+                error={errors["traveller-last"]}
+              >
                 <Input
+                  id="traveller-last"
                   value={lastName}
                   onChange={(event) => setLastName(event.target.value)}
-                  required
                 />
               </Field>
             </FieldGrid>
@@ -236,8 +285,13 @@ export function EditTravellerDialog({
             </FieldGrid>
 
             <FieldGrid>
-              <Field label="Passport number">
+              <Field
+                label="Passport number"
+                htmlFor="traveller-passport"
+                error={errors["traveller-passport"]}
+              >
                 <Input
+                  id="traveller-passport"
                   value={passportNumber}
                   onChange={(event) => setPassportNumber(event.target.value)}
                   className="font-mono uppercase"
@@ -261,7 +315,11 @@ export function EditTravellerDialog({
                   onChange={setPassportIssueDate}
                 />
               </Field>
-              <Field label="Passport expires" htmlFor="traveller-passport-expiry">
+              <Field
+                label="Passport expires"
+                htmlFor="traveller-passport-expiry"
+                error={errors["traveller-passport-expiry"]}
+              >
                 <DateField
                   id="traveller-passport-expiry"
                   value={passportExpiryDate}
@@ -277,15 +335,16 @@ export function EditTravellerDialog({
                   onChange={(event) => setOccupation(event.target.value)}
                 />
               </Field>
-              <Field label="Email">
+              <Field label="Email" htmlFor="traveller-email" error={errors["traveller-email"]}>
                 <Input
+                  id="traveller-email"
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </Field>
-              <Field label="Phone">
-                <PhoneField value={phone} onChange={setPhone} />
+              <Field label="Phone" htmlFor="traveller-phone" error={errors["traveller-phone"]}>
+                <PhoneField id="traveller-phone" value={phone} onChange={setPhone} />
               </Field>
             </FieldGrid>
 

@@ -55,6 +55,8 @@ import {
 } from "@/components/shared/states";
 import { CursorPagination } from "@/components/tables/data-table";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
+import { FieldError } from "@/components/shared/form-field";
 import {
   formatDate,
   formatDateTime,
@@ -75,6 +77,7 @@ import {
   type PartnerStatus,
 } from "@/lib/constants/partners";
 import type { ApplicationStatus, PaymentStatusValue } from "@/lib/constants/statuses";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -275,18 +278,22 @@ function OverviewTab({
       await setInternalNote({ partnerId, note });
       toast.success("Internal note saved.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save the note.");
+      toast.error(friendlyError(error, "Could not save the note."));
     } finally {
       setSavingNote(false);
     }
   }
 
-  async function saveMarkup() {
+  const markupValidation = useValidation((): FieldErrors => {
     const value = Number.parseFloat(markup);
-    if (!Number.isFinite(value) || value < 0 || value > MAX_MARKUP_PERCENT) {
-      toast.error(`Enter a markup between 0 and ${MAX_MARKUP_PERCENT}%.`);
-      return;
-    }
+    return !Number.isFinite(value) || value < 0 || value > MAX_MARKUP_PERCENT
+      ? { "partner-markup": `Enter a markup between 0 and ${MAX_MARKUP_PERCENT}%.` }
+      : {};
+  });
+
+  async function saveMarkup() {
+    if (!markupValidation.check()) return;
+    const value = Number.parseFloat(markup);
     setSavingMarkup(true);
     try {
       const result = await setDefaultMarkup({
@@ -296,7 +303,7 @@ function OverviewTab({
       toast.success(`Default markup set to ${result.defaultMarkupPercent}%.`);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save the markup.",
+        friendlyError(error, "Could not save the markup."),
       );
     } finally {
       setSavingMarkup(false);
@@ -504,6 +511,13 @@ function OverviewTab({
                 </p>
                 <div className="flex items-center gap-2">
                   <Input
+                    id="partner-markup"
+                    aria-invalid={markupValidation.errors["partner-markup"] ? true : undefined}
+                    aria-describedby={
+                      markupValidation.errors["partner-markup"]
+                        ? "partner-markup-error"
+                        : undefined
+                    }
                     type="number"
                     inputMode="decimal"
                     min={0}
@@ -525,6 +539,10 @@ function OverviewTab({
                     {savingMarkup ? "Saving…" : "Save"}
                   </Button>
                 </div>
+                <FieldError
+                  id="partner-markup"
+                  message={markupValidation.errors["partner-markup"]}
+                />
               </CardContent>
             </Card>
           )}
@@ -567,9 +585,7 @@ function OverviewTab({
                         toast.success(`${partner.agencyName} removed.`);
                       } catch (error) {
                         toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Could not remove the partner.",
+                          friendlyError(error, "Could not remove the partner."),
                         );
                       }
                     }}

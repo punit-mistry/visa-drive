@@ -264,12 +264,15 @@ export async function onPartnerBookingSubmitted(
   const partner = await ctx.db.get(application.partnerId);
   if (!partner) return;
 
-  const customerRow = await ctx.db
+  // `.take(2)`, not `.unique()`: a duplicate row must not fail the submission.
+  const customerRows = await ctx.db
     .query("partnerCustomers")
     .withIndex("by_partner_user", (q) =>
       q.eq("partnerId", partner._id).eq("userId", application.userId),
     )
-    .unique();
+    .take(2);
+  const customerRow =
+    customerRows.find((r) => !r.isArchived) ?? customerRows[0] ?? null;
 
   const now = Date.now();
 

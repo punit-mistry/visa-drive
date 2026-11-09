@@ -28,8 +28,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { CountrySelect } from "@/components/shared/country-select";
-import { DateField } from "@/components/shared/date-field";
 import { FileDropzone } from "@/components/shared/file-dropzone";
 import { Field, FieldGrid } from "@/components/shared/form-field";
 import { PageHeader } from "@/components/shared/page-header";
@@ -38,10 +36,26 @@ import { DemoContentBadge } from "@/components/shared/status-badge";
 import { EmptyState, ListSkeleton } from "@/components/shared/states";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useDocumentUpload } from "@/hooks/use-document-upload";
-import { fromDateInput, fullName, toDateInput } from "@/lib/helpers/format";
+import { useValidation, zodMessage, type FieldErrors } from "@/hooks/use-validation";
+import { fullName } from "@/lib/helpers/format";
+import { emailField, phoneField } from "@/lib/validators/forms";
 import { formatMoney, formatProcessingTime } from "@/lib/helpers/pricing";
 import { formatMarginPercent } from "@/lib/helpers/partner-pricing";
 import { cn } from "@/lib/utils";
+import {
+  fieldLabel,
+  friendlyError,
+  incompleteApplicationSummary,
+  parseIncompleteApplication,
+  pruneIncomplete,
+  type IncompleteApplication,
+} from "@/lib/helpers/error-messages";
+import {
+  ApplicantForm,
+  missingFor,
+} from "@/components/application/applicant-form";
+import { IncompleteChecklist } from "@/components/shared/incomplete-checklist";
+import { FieldError } from "@/components/shared/form-field";
 
 /* ============================================================================
  * The partner booking wizard.
@@ -104,6 +118,8 @@ function NewBookingWizard() {
   const [creating, setCreating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [incomplete, setIncomplete] = useState<IncompleteApplication | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const createDraft = useMutation(api.partnerBookings.createDraft);
   const submit = useMutation(api.applications.submit);
@@ -135,11 +151,51 @@ function NewBookingWizard() {
     visaProductId ? { visaProductId, travellerCount } : "skip",
   );
 
-  const canLeaveStep1 = !!visaProductId && travellerCount >= 1;
-  const canLeaveStep2 = useNewCustomer
-    ? newCustomer.fullName.trim().length >= 2 &&
-      newCustomer.email.trim().includes("@")
-    : !!partnerCustomerId;
+  // The refused-submit checklist, minus whatever has been fixed since.
+  const liveIncomplete = useMemo(() => {
+    if (!incomplete) return null;
+    const required = new Set(draft?.product?.requiredApplicantFields ?? []);
+    return pruneIncomplete(incomplete, {
+      travellers: (draft?.applicants ?? []).map((a) => ({
+        id: a._id,
+        missingKeys: missingFor(a, required),
+      })),
+      uploaded: (draft?.documents ?? []).map((d) => ({
+        documentKey: d.documentKey,
+        applicantId: d.applicantId,
+      })),
+      termsAccepted,
+      travellerCount,
+    });
+  }, [incomplete, draft, termsAccepted, travellerCount]);
+
+  // Validated when Continue / Submit is clicked, then live: the button is never
+  // disabled for a reason the user cannot see.
+  const validateStep = useCallback((): FieldErrors => {
+    const errors: FieldErrors = {};
+    if (step === 1) {
+      if (!visaProductId) errors["service-list"] = "Choose a visa service to continue.";
+      if (!(travellerCount >= 1)) errors["traveller-count"] = "At least one traveller.";
+    } else if (step === 2) {
+      if (useNewCustomer) {
+        if (newCustomer.fullName.trim().length < 2) {
+          errors["nc-name"] = "Enter the customer's name.";
+        }
+        const email = zodMessage(emailField, newCustomer.email);
+        if (email) errors["nc-email"] = email;
+        if (newCustomer.phone.trim()) {
+          const phone = zodMessage(phoneField, newCustomer.phone);
+          if (phone) errors["nc-phone"] = phone;
+        }
+      } else if (!partnerCustomerId) {
+        errors["customer-list"] = "Choose a customer, or add a new one.";
+      }
+    } else if (step === STEPS.length && !termsAccepted) {
+      errors["partner-terms"] = "Confirm your customer has agreed to the terms.";
+    }
+    return errors;
+  }, [step, visaProductId, travellerCount, useNewCustomer, newCustomer, partnerCustomerId, termsAccepted]);
+  const { errors, check } = useValidation(validateStep, step);
 
   /** Create (or reuse) the draft, which is what steps 3+ write against. */
   const ensureDraft = useCallback(async (): Promise<Id<"applications"> | null> => {
@@ -178,7 +234,7 @@ function NewBookingWizard() {
       return result.applicationId;
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not start the booking.",
+        friendlyError(error, "Could not start the booking."),
       );
       return null;
     } finally {
@@ -196,19 +252,13 @@ function NewBookingWizard() {
 
   async function goNext() {
     if (step === 1) {
-      if (!canLeaveStep1) {
-        toast.error("Choose a visa service first.");
-        return;
-      }
+      if (!check()) return;
       setStep(2);
       return;
     }
 
     if (step === 2) {
-      if (!canLeaveStep2) {
-        toast.error("Choose a customer, or enter their details.");
-        return;
-      }
+      if (!check()) return;
       const id = await ensureDraft();
       if (id) setStep(3);
       return;
@@ -219,12 +269,10 @@ function NewBookingWizard() {
 
   async function handleSubmit() {
     if (!applicationId) return;
-    if (!termsAccepted) {
-      toast.error("Confirm your customer has agreed to the terms.");
-      return;
-    }
+    if (!check()) return;
 
     setSubmitting(true);
+    setIncomplete(null);
     try {
       const result = await submit({ applicationId, acceptTerms: true });
       toast.success(`Booking ${result.referenceId} submitted.`, {
@@ -232,33 +280,13 @@ function NewBookingWizard() {
       });
       router.push(`/partner/bookings/${result.applicationId}`);
     } catch (error) {
-      const data = (error as { data?: Record<string, unknown> })?.data;
-      if (data && data.code === "INCOMPLETE_APPLICATION") {
-        const problems = (data.problems as string[] | undefined) ?? [];
-        const missingDocuments =
-          (data.documents as { label: string }[] | undefined) ?? [];
-        const applicantIssues =
-          (data.applicants as { name: string; missingFields: string[] }[] | undefined) ??
-          [];
-
-        toast.error("This booking is not complete yet.", {
-          description: [
-            ...problems,
-            ...applicantIssues.map(
-              (a) => `${a.name}: ${a.missingFields.join(", ")}`,
-            ),
-            ...missingDocuments.map((d) => `Missing: ${d.label}`),
-          ]
-            .slice(0, 4)
-            .join(" · "),
-        });
-
-        if (applicantIssues.length > 0) setStep(3);
-        else if (missingDocuments.length > 0) setStep(4);
+      const details = parseIncompleteApplication(error);
+      if (details) {
+        setIncomplete(details);
+        toast.error(incompleteApplicationSummary(details));
+        window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        toast.error(
-          error instanceof Error ? error.message : "Could not submit the booking.",
-        );
+        toast.error(friendlyError(error, "Could not submit the booking."));
       }
     } finally {
       setSubmitting(false);
@@ -287,9 +315,7 @@ function NewBookingWizard() {
                   router.push("/partner/bookings");
                 } catch (error) {
                   toast.error(
-                    error instanceof Error
-                      ? error.message
-                      : "Could not discard the draft.",
+                    friendlyError(error, "Could not discard the draft."),
                   );
                 }
               }}
@@ -303,6 +329,22 @@ function NewBookingWizard() {
 
       <Stepper current={step} onJump={(id) => applicationId && setStep(id)} />
 
+      {liveIncomplete && (
+        <IncompleteChecklist
+          info={liveIncomplete}
+          onFix={(target) => {
+            if (target === "travellers") {
+              setEditingId(
+                liveIncomplete.travellers.find((t) => t.applicantId)?.applicantId ??
+                  null,
+              );
+            }
+            setStep(target === "travellers" ? 3 : 4);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {step === 1 && (
@@ -312,6 +354,7 @@ function NewBookingWizard() {
               travellerCount={travellerCount}
               onTravellerCount={setTravellerCount}
               locked={!!applicationId}
+              errors={errors}
             />
           )}
 
@@ -327,6 +370,7 @@ function NewBookingWizard() {
               newCustomer={newCustomer}
               onNewCustomer={setNewCustomer}
               locked={!!applicationId}
+              errors={errors}
             />
           )}
 
@@ -335,6 +379,8 @@ function NewBookingWizard() {
               applicationId={applicationId}
               travellerCount={travellerCount}
               draft={draft}
+              editingId={editingId}
+              onEditingId={setEditingId}
             />
           )}
 
@@ -347,6 +393,7 @@ function NewBookingWizard() {
               draft={draft}
               termsAccepted={termsAccepted}
               onTermsAccepted={setTermsAccepted}
+              error={errors["partner-terms"]}
             />
           )}
 
@@ -376,7 +423,7 @@ function NewBookingWizard() {
                 {!creating && <ArrowRight className="size-4" aria-hidden />}
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={submitting || !termsAccepted}>
+              <Button onClick={handleSubmit} disabled={submitting}>
                 {submitting && <Loader2 className="size-4 animate-spin" aria-hidden />}
                 {submitting ? "Submitting…" : "Submit booking"}
                 {!submitting && <Check className="size-4" aria-hidden />}
@@ -457,12 +504,14 @@ function ServiceStep({
   travellerCount,
   onTravellerCount,
   locked,
+  errors,
 }: {
   visaProductId: Id<"visaProducts"> | null;
   onSelect: (id: Id<"visaProducts">) => void;
   travellerCount: number;
   onTravellerCount: (count: number) => void;
   locked: boolean;
+  errors: FieldErrors;
 }) {
   const [search, setSearch] = useState("");
   const [destinationId, setDestinationId] = useState("");
@@ -534,7 +583,12 @@ function ServiceStep({
             description="Try a different destination or clear the search."
           />
         ) : (
-          <ul className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
+          <ul
+            id="service-list"
+            tabIndex={-1}
+            aria-describedby={errors["service-list"] ? "service-list-error" : undefined}
+            className="max-h-[26rem] space-y-2 overflow-y-auto pr-1 focus-brand"
+          >
             {catalogue.rows.map((row) => {
               const selected = row.visaProductId === visaProductId;
               return (
@@ -599,11 +653,18 @@ function ServiceStep({
           </ul>
         )}
 
+        {errors["service-list"] && (
+          <p id="service-list-error" role="alert" className="text-xs text-destructive">
+            {errors["service-list"]}
+          </p>
+        )}
+
         <Separator />
 
         <Field
           label="How many travellers?"
           htmlFor="traveller-count"
+          error={errors["traveller-count"]}
           hint="You can add their details on the next steps."
         >
           <Input
@@ -638,6 +699,7 @@ function CustomerStep({
   newCustomer,
   onNewCustomer,
   locked,
+  errors,
 }: {
   partnerCustomerId: Id<"partnerCustomers"> | null;
   onSelect: (id: Id<"partnerCustomers">) => void;
@@ -656,6 +718,7 @@ function CustomerStep({
     reference: string;
   }) => void;
   locked: boolean;
+  errors: FieldErrors;
 }) {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search);
@@ -709,7 +772,13 @@ function CustomerStep({
 
         {useNewCustomer ? (
           <FieldGrid>
-            <Field label="Full name" required htmlFor="nc-name" className="sm:col-span-2">
+            <Field
+              label="Full name"
+              required
+              htmlFor="nc-name"
+              className="sm:col-span-2"
+              error={errors["nc-name"]}
+            >
               <Input
                 id="nc-name"
                 value={newCustomer.fullName}
@@ -720,7 +789,7 @@ function CustomerStep({
                 disabled={locked}
               />
             </Field>
-            <Field label="Email" required htmlFor="nc-email">
+            <Field label="Email" required htmlFor="nc-email" error={errors["nc-email"]}>
               <Input
                 id="nc-email"
                 type="email"
@@ -732,7 +801,7 @@ function CustomerStep({
                 disabled={locked}
               />
             </Field>
-            <Field label="Phone" htmlFor="nc-phone">
+            <Field label="Phone" htmlFor="nc-phone" error={errors["nc-phone"]}>
               <PhoneField
                 id="nc-phone"
                 value={newCustomer.phone}
@@ -792,7 +861,14 @@ function CustomerStep({
                 }
               />
             ) : (
-              <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
+              <ul
+                id="customer-list"
+                tabIndex={-1}
+                aria-describedby={
+                  errors["customer-list"] ? "customer-list-error" : undefined
+                }
+                className="max-h-80 space-y-2 overflow-y-auto pr-1 focus-brand"
+              >
                 {rows.map((customer) => {
                   const selected = customer._id === partnerCustomerId;
                   return (
@@ -833,6 +909,15 @@ function CustomerStep({
                 })}
               </ul>
             )}
+            {errors["customer-list"] && (
+              <p
+                id="customer-list-error"
+                role="alert"
+                className="text-xs text-destructive"
+              >
+                {errors["customer-list"]}
+              </p>
+            )}
           </>
         )}
       </CardContent>
@@ -859,70 +944,23 @@ function TravellersStep({
   applicationId,
   travellerCount,
   draft,
+  editingId,
+  onEditingId,
 }: {
   applicationId: Id<"applications">;
   travellerCount: number;
   draft: DraftPayload;
+  /** The traveller whose details are open for editing, if any. */
+  editingId: string | null;
+  onEditingId: (id: string | null) => void;
 }) {
-  const upsert = useMutation(api.applicants.upsert);
   const remove = useMutation(api.applicants.remove);
-  const [saving, setSaving] = useState(false);
 
   const applicants = draft?.applicants ?? [];
-  const requiredFields = draft?.product?.requiredApplicantFields ?? [];
-
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    dateOfBirth: undefined as number | undefined,
-    nationality: "",
-    passportNumber: "",
-    passportExpiryDate: undefined as number | undefined,
-    email: "",
-    phone: "",
-  });
-
-  async function add() {
-    if (form.firstName.trim().length < 1 || form.lastName.trim().length < 1) {
-      toast.error("Enter the traveller's first and last name.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await upsert({
-        applicationId,
-        data: {
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          dateOfBirth: form.dateOfBirth,
-          nationality: form.nationality.trim() || undefined,
-          passportNumber: form.passportNumber.trim() || undefined,
-          passportExpiryDate: form.passportExpiryDate,
-          email: form.email.trim() || undefined,
-          phone: form.phone.trim() || undefined,
-          isPrimary: applicants.length === 0,
-        },
-      });
-      toast.success(`${form.firstName.trim()} added.`);
-      setForm({
-        firstName: "",
-        lastName: "",
-        dateOfBirth: undefined,
-        nationality: "",
-        passportNumber: "",
-        passportExpiryDate: undefined,
-        email: "",
-        phone: "",
-      });
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not add the traveller.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
+  const requiredFields = useMemo(
+    () => new Set(draft?.product?.requiredApplicantFields ?? []),
+    [draft?.product?.requiredApplicantFields],
+  );
 
   return (
     <div className="space-y-4">
@@ -952,52 +990,75 @@ function TravellersStep({
             />
           ) : (
             <ul className="divide-y divide-border">
-              {applicants.map((applicant) => (
-                <li
-                  key={applicant._id}
-                  className="flex flex-wrap items-center gap-3 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {fullName(applicant)}
-                      {applicant.isPrimary && (
-                        <span className="ml-2 rounded-full border border-border bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          Primary
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {[
-                        applicant.nationality,
-                        applicant.passportNumber
-                          ? `Passport ${applicant.passportNumber}`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "Details pending"}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remove ${fullName(applicant)}`}
-                    onClick={async () => {
-                      try {
-                        await remove({ applicationId, applicantId: applicant._id });
-                        toast.success("Traveller removed.");
-                      } catch (error) {
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Could not remove the traveller.",
-                        );
-                      }
-                    }}
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                  </Button>
-                </li>
-              ))}
+              {applicants.map((applicant) => {
+                const missing = missingFor(applicant, requiredFields);
+                const editing = editingId === applicant._id;
+                return (
+                  <li key={applicant._id} className="py-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">
+                          {fullName(applicant)}
+                          {applicant.isPrimary && (
+                            <span className="ml-2 rounded-full border border-border bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              Primary
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {missing.length > 0
+                            ? `Still to fill in: ${missing.map(fieldLabel).join(", ")}`
+                            : [
+                                applicant.nationality,
+                                applicant.passportNumber
+                                  ? `Passport ${applicant.passportNumber}`
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ") || "Details complete"}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onEditingId(editing ? null : applicant._id)}
+                        aria-expanded={editing}
+                      >
+                        {editing ? "Close" : "Edit details"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remove ${fullName(applicant)}`}
+                        onClick={async () => {
+                          try {
+                            await remove({ applicationId, applicantId: applicant._id });
+                            if (editing) onEditingId(null);
+                            toast.success("Traveller removed.");
+                          } catch (error) {
+                            toast.error(
+                              friendlyError(error, "Could not remove the traveller."),
+                            );
+                          }
+                        }}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden />
+                      </Button>
+                    </div>
+                    {editing && (
+                      <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+                        <ApplicantForm
+                          applicationId={applicationId}
+                          applicant={applicant}
+                          requiredFields={requiredFields}
+                          missing={missing}
+                          onSaved={() => onEditingId(null)}
+                        />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>
@@ -1009,112 +1070,11 @@ function TravellersStep({
             <h3 className="text-sm font-semibold tracking-tight">
               Add traveller {applicants.length + 1}
             </h3>
-
-            <FieldGrid>
-              <Field label="First name" required htmlFor="t-first">
-                <Input
-                  id="t-first"
-                  value={form.firstName}
-                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                  placeholder="As printed in the passport"
-                  disabled={saving}
-                />
-              </Field>
-              <Field label="Last name" required htmlFor="t-last">
-                <Input
-                  id="t-last"
-                  value={form.lastName}
-                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                  disabled={saving}
-                />
-              </Field>
-
-              <Field
-                label="Date of birth"
-                htmlFor="t-dob"
-                required={requiredFields.includes("dateOfBirth")}
-              >
-                <DateField
-                  id="t-dob"
-                  value={toDateInput(form.dateOfBirth)}
-                  onChange={(next) =>
-                    setForm({ ...form, dateOfBirth: fromDateInput(next) })
-                  }
-                  maxDate={new Date()}
-                  disabled={saving}
-                />
-              </Field>
-
-              <Field
-                label="Nationality"
-                htmlFor="t-nationality"
-                required={requiredFields.includes("nationality")}
-              >
-                <CountrySelect
-                  id="t-nationality"
-                  value={form.nationality}
-                  onChange={(next) => setForm({ ...form, nationality: next })}
-                  disabled={saving}
-                />
-              </Field>
-
-              <Field
-                label="Passport number"
-                htmlFor="t-passport"
-                required={requiredFields.includes("passportNumber")}
-              >
-                <Input
-                  id="t-passport"
-                  value={form.passportNumber}
-                  onChange={(e) =>
-                    setForm({ ...form, passportNumber: e.target.value.toUpperCase() })
-                  }
-                  className="font-mono"
-                  disabled={saving}
-                />
-              </Field>
-
-              <Field
-                label="Passport expiry"
-                htmlFor="t-expiry"
-                required={requiredFields.includes("passportExpiryDate")}
-              >
-                <DateField
-                  id="t-expiry"
-                  value={toDateInput(form.passportExpiryDate)}
-                  onChange={(next) =>
-                    setForm({ ...form, passportExpiryDate: fromDateInput(next) })
-                  }
-                  minDate={new Date()}
-                  disabled={saving}
-                />
-              </Field>
-
-              <Field label="Email" htmlFor="t-email">
-                <Input
-                  id="t-email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  disabled={saving}
-                />
-              </Field>
-
-              <Field label="Phone" htmlFor="t-phone">
-                <PhoneField
-                  id="t-phone"
-                  value={form.phone}
-                  onChange={(next) => setForm({ ...form, phone: next })}
-                  disabled={saving}
-                />
-              </Field>
-            </FieldGrid>
-
-            <Button onClick={add} disabled={saving}>
-              {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              <Plus className="size-4" aria-hidden />
-              Add traveller
-            </Button>
+            <ApplicantForm
+              key={applicants.length}
+              applicationId={applicationId}
+              requiredFields={requiredFields}
+            />
           </CardContent>
         </Card>
       )}
@@ -1179,109 +1139,146 @@ function DocumentsStep({
       </Card>
 
       {requirements.map((requirement) => {
-        const uploaded = byKey.get(requirement.documentKey) ?? [];
-        const perTraveller = requirement.appliesTo === "all" && applicants.length > 1;
+        const perTraveller =
+          requirement.appliesTo === "all" && applicants.length > 0;
+        const all = byKey.get(requirement.documentKey) ?? [];
+        // One block per traveller for "all" requirements; otherwise a single
+        // block with no applicantId (matches the server's completeness check).
+        const blocks: {
+          id: string;
+          applicantId?: Id<"applicants">;
+          name?: string;
+          uploaded: Doc<"documents">[];
+        }[] = perTraveller
+          ? applicants.map((applicant) => ({
+              id: applicant._id,
+              applicantId: applicant._id,
+              name: fullName(applicant),
+              uploaded: all.filter((d) => d.applicantId === applicant._id),
+            }))
+          : [{ id: "general", uploaded: all }];
 
         return (
           <Card key={requirement._id}>
-            <CardContent className="space-y-3 p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {requirement.label}
-                    {requirement.isMandatory && (
-                      <span className="ml-0.5 text-destructive" aria-label="required">
-                        *
-                      </span>
-                    )}
+            <CardContent className="space-y-4 p-5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  {requirement.label}
+                  {requirement.isMandatory && (
+                    <span className="ml-0.5 text-destructive" aria-label="required">
+                      *
+                    </span>
+                  )}
+                </p>
+                {requirement.description && (
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    {requirement.description}
                   </p>
-                  {requirement.description && (
-                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      {requirement.description}
-                    </p>
-                  )}
-                  {perTraveller && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      One per traveller is needed for this document.
-                    </p>
-                  )}
-                </div>
-                {uploaded.length > 0 && (
-                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {uploaded.length} uploaded
-                  </span>
+                )}
+                {perTraveller && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Needed for each traveller.
+                  </p>
                 )}
               </div>
 
-              {uploaded.length > 0 && (
-                <ul className="space-y-1.5">
-                  {uploaded.map((document) => (
-                    <li
-                      key={document._id}
-                      className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs"
-                    >
-                      <FileText
-                        className="size-3.5 shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 truncate">
-                        {document.fileName}
-                      </span>
-                      <CheckCircle2 className="size-3.5 text-success" aria-hidden />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-6"
-                        aria-label={`Remove ${document.fileName}`}
-                        disabled={removing === document._id}
-                        onClick={async () => {
-                          setRemoving(document._id);
-                          try {
-                            await removeDocument({ documentId: document._id });
-                            toast.success(`${document.fileName} removed.`);
-                          } catch (error) {
-                            toast.error(
-                              error instanceof Error
-                                ? error.message
-                                : "Could not remove the file.",
-                            );
-                          } finally {
-                            setRemoving(null);
-                          }
-                        }}
-                      >
-                        {removing === document._id ? (
-                          <Loader2 className="size-3 animate-spin" aria-hidden />
-                        ) : (
-                          <Trash2 className="size-3" aria-hidden />
-                        )}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {blocks.map((block) => (
+                <div
+                  key={block.id}
+                  className={
+                    perTraveller
+                      ? "space-y-2 rounded-lg border border-border p-3"
+                      : "space-y-2"
+                  }
+                >
+                  {perTraveller && (
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium">{block.name}</p>
+                      {block.uploaded.length > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-success">
+                          <CheckCircle2 className="size-3.5" aria-hidden />
+                          Uploaded
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Not uploaded
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-              <FileDropzone
-                compact
-                multiple={perTraveller}
-                uploads={upload.uploads.filter((u) =>
-                  u.id.startsWith(`${requirement.documentKey}:`),
-                )}
-                onRemove={upload.removeUpload}
-                allowedMimeTypes={requirement.allowedMimeTypes}
-                maxSizeBytes={requirement.maxSizeBytes}
-                onFiles={(files) => {
-                  void upload.uploadMany(files, {
-                    documentKey: requirement.documentKey,
-                    label: requirement.label,
-                    constraints: {
-                      allowedMimeTypes: requirement.allowedMimeTypes,
-                      maxSizeBytes: requirement.maxSizeBytes,
-                    },
-                  });
-                }}
-              />
+                  {block.uploaded.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {block.uploaded.map((document) => (
+                        <li
+                          key={document._id}
+                          className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs"
+                        >
+                          <FileText
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                            aria-hidden
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {document.fileName}
+                          </span>
+                          <CheckCircle2 className="size-3.5 text-success" aria-hidden />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-6"
+                            aria-label={`Remove ${document.fileName}`}
+                            disabled={removing === document._id}
+                            onClick={async () => {
+                              setRemoving(document._id);
+                              try {
+                                await removeDocument({ documentId: document._id });
+                                toast.success(`${document.fileName} removed.`);
+                              } catch (error) {
+                                toast.error(
+                                  friendlyError(error, "Could not remove the file."),
+                                );
+                              } finally {
+                                setRemoving(null);
+                              }
+                            }}
+                          >
+                            {removing === document._id ? (
+                              <Loader2 className="size-3 animate-spin" aria-hidden />
+                            ) : (
+                              <Trash2 className="size-3" aria-hidden />
+                            )}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <FileDropzone
+                    compact
+                    multiple={!perTraveller}
+                    uploads={upload.uploads.filter((u) =>
+                      u.id.startsWith(
+                        `${requirement.documentKey}:${block.applicantId ?? "general"}:`,
+                      ),
+                    )}
+                    onRemove={upload.removeUpload}
+                    allowedMimeTypes={requirement.allowedMimeTypes}
+                    maxSizeBytes={requirement.maxSizeBytes}
+                    onFiles={(files) => {
+                      void upload.uploadMany(files, {
+                        documentKey: requirement.documentKey,
+                        label: requirement.label,
+                        applicantId: block.applicantId,
+                        constraints: {
+                          allowedMimeTypes: requirement.allowedMimeTypes,
+                          maxSizeBytes: requirement.maxSizeBytes,
+                        },
+                      });
+                    }}
+                  />
+                </div>
+              ))}
             </CardContent>
           </Card>
         );
@@ -1304,10 +1301,12 @@ function ReviewStep({
   draft,
   termsAccepted,
   onTermsAccepted,
+  error,
 }: {
   draft: DraftPayload;
   termsAccepted: boolean;
   onTermsAccepted: (value: boolean) => void;
+  error?: string;
 }) {
   if (!draft) return <ListSkeleton rows={4} />;
 
@@ -1423,6 +1422,8 @@ function ReviewStep({
               id="partner-terms"
               checked={termsAccepted}
               onCheckedChange={(checked) => onTermsAccepted(checked === true)}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "partner-terms-error" : undefined}
               className="mt-0.5"
             />
             <Label
@@ -1447,6 +1448,9 @@ function ReviewStep({
               </Link>
               , and that the details above are accurate.
             </Label>
+          </div>
+          <div className="mt-2">
+            <FieldError id="partner-terms" message={error} />
           </div>
         </CardContent>
       </Card>

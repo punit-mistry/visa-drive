@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -87,6 +88,16 @@ export function VisaDiscoveryForm({
     },
     mode: "onSubmit",
   });
+
+  // The United States is the destination most people come for, so it is
+  // preselected once the catalogue arrives — unless the caller already chose
+  // one, or the visitor has picked something themselves.
+  const usSlug = destinations?.find((d) => d.countryCode === "US")?.slug;
+  useEffect(() => {
+    if (!usSlug) return;
+    if (form.getValues("toCountry")) return;
+    form.setValue("toCountry", usSlug);
+  }, [usSlug, form]);
 
   const isLoading = destinations === undefined;
   const hasDestinations = !isLoading && destinations.length > 0;

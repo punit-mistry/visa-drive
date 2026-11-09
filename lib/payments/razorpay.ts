@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/lib/helpers/error-messages";
 /**
  * Razorpay Checkout — client side only.
  *
@@ -67,7 +68,7 @@ let loader: Promise<RazorpayConstructor> | null = null;
 export function loadRazorpayScript(): Promise<RazorpayConstructor> {
   if (typeof window === "undefined") {
     return Promise.reject(
-      new Error("Razorpay Checkout can only be opened in the browser."),
+      new UserFacingError("The payment window can only be opened in your browser."),
     );
   }
   if (window.Razorpay) return Promise.resolve(window.Razorpay);
@@ -80,9 +81,9 @@ export function loadRazorpayScript(): Promise<RazorpayConstructor> {
 
     const onLoad = () => {
       if (window.Razorpay) resolve(window.Razorpay);
-      else reject(new Error("Razorpay Checkout loaded but did not initialise."));
+      else reject(new UserFacingError("We could not open the payment window. Please try again."));
     };
-    const onError = () => reject(new Error("Could not load Razorpay Checkout."));
+    const onError = () => reject(new UserFacingError("We could not open the payment window. Check your connection and try again."));
 
     if (existing) {
       existing.addEventListener("load", onLoad, { once: true });

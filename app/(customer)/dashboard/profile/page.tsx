@@ -16,6 +16,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { DetailSkeleton } from "@/components/shared/states";
 import { formatDate } from "@/lib/helpers/format";
 import { ROLE_LABELS, type UserRole } from "@/lib/constants/roles";
+import { useValidation, zodMessage, type FieldErrors } from "@/hooks/use-validation";
+import { FieldError } from "@/components/shared/form-field";
+import { phoneField } from "@/lib/validators/forms";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 type CurrentUser = NonNullable<FunctionReturnType<typeof api.users.current>>;
 
@@ -43,8 +47,19 @@ function ProfileForm({ user }: { user: CurrentUser }) {
   const [whatsappOptIn, setWhatsappOptIn] = useState(user.whatsappOptIn ?? false);
   const [saving, setSaving] = useState(false);
 
+  const { errors, check } = useValidation((): FieldErrors => {
+    const found: FieldErrors = {};
+    if (fullName.trim().length < 2) found.fullName = "Enter your full name.";
+    if (phone.trim()) {
+      const message = zodMessage(phoneField, phone);
+      if (message) found.phone = message;
+    }
+    return found;
+  });
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (!check()) return;
     setSaving(true);
     try {
       await updateProfile({
@@ -55,7 +70,7 @@ function ProfileForm({ user }: { user: CurrentUser }) {
       });
       toast.success("Profile updated.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update your profile.");
+      toast.error(friendlyError(error, "Could not update your profile."));
     } finally {
       setSaving(false);
     }
@@ -74,17 +89,18 @@ function ProfileForm({ user }: { user: CurrentUser }) {
             <CardTitle>Your details</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} noValidate className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full name</Label>
                 <Input
                   id="fullName"
                   value={fullName}
                   onChange={(event) => setFullName(event.target.value)}
-                  required
-                  minLength={2}
+                  aria-invalid={errors.fullName ? true : undefined}
+                  aria-describedby={errors.fullName ? "fullName-error" : undefined}
                   autoComplete="name"
                 />
+                <FieldError id="fullName" message={errors.fullName} />
               </div>
 
               <div className="space-y-2">
@@ -102,8 +118,11 @@ function ProfileForm({ user }: { user: CurrentUser }) {
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
                   placeholder="+91 98765 43210"
+                  aria-invalid={errors.phone ? true : undefined}
+                  aria-describedby={errors.phone ? "phone-error" : undefined}
                   autoComplete="tel"
                 />
+                <FieldError id="phone" message={errors.phone} />
               </div>
 
               <div className="space-y-3">

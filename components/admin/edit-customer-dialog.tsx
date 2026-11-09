@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useMutation } from "convex/react";
 import { Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +20,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/shared/form-field";
 import { PhoneField } from "@/components/shared/phone-field";
+import { useValidation, zodMessage, type FieldErrors } from "@/hooks/use-validation";
+import { phoneField } from "@/lib/validators/forms";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Correct a customer's contact details from the application they are on.
@@ -46,15 +49,30 @@ export function EditCustomerDialog({
   const [fullName, setFullName] = useState(customer.fullName);
   const [phone, setPhone] = useState(customer.phone ?? "");
 
+  const validate = useCallback((): FieldErrors => {
+    const errors: FieldErrors = {};
+    if (fullName.trim().length < 2) {
+      errors["customer-name"] = "Enter the customer's full name.";
+    }
+    if (phone.trim()) {
+      const message = zodMessage(phoneField, phone);
+      if (message) errors["customer-phone"] = message;
+    }
+    return errors;
+  }, [fullName, phone]);
+  const { errors, check, reset: resetValidation } = useValidation(validate);
+
   function reset() {
     setFullName(customer.fullName);
     setPhone(customer.phone ?? "");
     setError(null);
+    resetValidation();
   }
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (saving) return;
+    if (!check()) return;
 
     setSaving(true);
     setError(null);
@@ -68,7 +86,7 @@ export function EditCustomerDialog({
       setOpen(false);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not save those changes.",
+        friendlyError(caught, "Could not save those changes."),
       );
     } finally {
       setSaving(false);
@@ -95,7 +113,7 @@ export function EditCustomerDialog({
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-md">
-        <form onSubmit={save}>
+        <form onSubmit={save} noValidate>
           <DialogHeader>
             <DialogTitle>Edit customer details</DialogTitle>
             <DialogDescription>
@@ -105,17 +123,21 @@ export function EditCustomerDialog({
           </DialogHeader>
 
           <div className="space-y-5 py-4">
-            <Field label="Full name" required>
+            <Field
+              label="Full name"
+              required
+              htmlFor="customer-name"
+              error={errors["customer-name"]}
+            >
               <Input
+                id="customer-name"
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
-                required
-                minLength={2}
               />
             </Field>
 
-            <Field label="Phone">
-              <PhoneField value={phone} onChange={setPhone} />
+            <Field label="Phone" htmlFor="customer-phone" error={errors["customer-phone"]}>
+              <PhoneField id="customer-phone" value={phone} onChange={setPhone} />
             </Field>
 
             <Field

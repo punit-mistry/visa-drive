@@ -44,8 +44,8 @@ import { SITE } from "@/lib/constants/site";
  * The United States. It is the bulk of the work that actually comes through
  * the door, so it is what the first screen shows.
  */
-const HERO_POSTER = "/media/newyork-approach.jpg";
-const HERO_VIDEO = "/media/newyork-approach.mp4";
+const HERO_POSTER = "/media/hero-reel.jpg";
+const HERO_VIDEO = "/media/hero-reel.mp4";
 
 /** Three promises the rest of the site has to keep, and does. */
 const ASSURANCES = [

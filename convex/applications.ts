@@ -320,7 +320,12 @@ export const saveDraftStep = mutation({
 export const getDraft = query({
   args: { applicationId: v.id("applications") },
   handler: async (ctx, args) => {
-    const { application } = await requireBookingEditor(ctx, args.applicationId);
+    const editor = await requireBookingEditor(ctx, args.applicationId);
+    // On a B2B booking the owner is the end traveller; the agent's margin is
+    // the agent's business, so only the partner who placed it sees it.
+    const application = editor.viaPartner
+      ? editor.application
+      : withoutMargin(editor.application);
 
     const [applicants, documents, product, requirements, destination] =
       await Promise.all([
@@ -363,13 +368,14 @@ export const listMyDrafts = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx);
-    return await ctx.db
+    const drafts = await ctx.db
       .query("applications")
       .withIndex("by_user_draft", (q) =>
         q.eq("userId", user._id).eq("isDraft", true),
       )
       .order("desc")
       .take(25);
+    return drafts.map(withoutMargin);
   },
 });
 
@@ -645,14 +651,28 @@ export const listMine = query({
       stream = stream.filter((q) => q.eq(q.field("isDraft"), false));
     }
 
-    return await stream.paginate(args.paginationOpts);
+    const result = await stream.paginate(args.paginationOpts);
+    // The caller owns these rows as the traveller; never the agent's margin.
+    return { ...result, page: result.page.map(withoutMargin) };
   },
 });
+
+/**
+ * The agent's frozen margin (what they pay VisaDrive and their markup) must
+ * never reach the end traveller who owns a B2B booking row.
+ */
+function withoutMargin<T extends Doc<"applications">>(
+  application: T,
+): T {
+  const { partnerMargin: _partnerMargin, ...rest } = application;
+  void _partnerMargin;
+  return rest as T;
+}
 
 async function applicationDetail(
   ctx: QueryCtx,
   application: Doc<"applications">,
-  opts: { includeInternal: boolean },
+  opts: { includeInternal: boolean; includeMargin: boolean },
 ) {
   const [applicants, documents, timeline, payments, documentRequests] =
     await Promise.all([
@@ -692,7 +712,7 @@ async function applicationDetail(
     ]);
 
   return {
-    application,
+    application: opts.includeMargin ? application : withoutMargin(application),
     applicants,
     documents,
     documentRequests,
@@ -710,6 +730,7 @@ export const getMine = query({
     const access = await requireApplicationAccess(ctx, args.applicationId);
     return await applicationDetail(ctx, access.application, {
       includeInternal: access.viaStaff,
+      includeMargin: access.viaStaff || access.viaPartner,
     });
   },
 });
@@ -733,6 +754,7 @@ export const getByReference = query({
     void user;
     return await applicationDetail(ctx, access.application, {
       includeInternal: access.viaStaff,
+      includeMargin: access.viaStaff || access.viaPartner,
     });
   },
 });
@@ -967,7 +989,6 @@ export const listForAdmin = query({
   args: { paginationOpts: paginationOptsValidator, ...adminFilterArgs },
   handler: async (ctx, args) => {
     await requirePermission(ctx, PERMISSIONS.APPLICATION_VIEW_ALL);
-
     const filters = args as AdminFilters;
     const options = streamOptions(filters);
     const stream = applyLeftoverFilters(
@@ -1000,14 +1021,34 @@ export const listForAdmin = query({
         .map((a) => [a._id as Id<"users">, a.fullName]),
     );
 
+    const partnerIds = [
+      ...new Set(
+        result.page
+          .map((a: Doc<"applications">) => a.partnerId)
+          .filter((id): id is Id<"partners"> => !!id),
+      ),
+    ];
+    const partners = await Promise.all(partnerIds.map((id) => ctx.db.get(id)));
+    const partnerName = new Map(
+      partners
+        .filter((p): p is Doc<"partners"> => p !== null)
+        .map((p) => [p._id as Id<"partners">, p.agencyName]),
+    );
+
     return {
       ...result,
-      page: result.page.map((application: Doc<"applications">) => ({
-        ...application,
-        assignedAgentName: application.assignedAgentId
-          ? (agentName.get(application.assignedAgentId) ?? null)
-          : null,
-      })),
+      page: result.page.map((application: Doc<"applications">) => {
+        // The list never renders the margin, so it never ships it.
+        return {
+          ...withoutMargin(application),
+          assignedAgentName: application.assignedAgentId
+            ? (agentName.get(application.assignedAgentId) ?? null)
+            : null,
+          partnerName: application.partnerId
+            ? (partnerName.get(application.partnerId) ?? null)
+            : null,
+        };
+      }),
     };
   },
 });
@@ -1020,16 +1061,24 @@ export const getForAdmin = query({
       authError("FORBIDDEN", "This view is restricted to VisaDrive staff.");
     }
 
+    const permissions = access.staff!.permissions;
+    const canSeeCommercials = permissions.has(PERMISSIONS.PARTNER_PRICING);
+    const canSeePartner = permissions.has(PERMISSIONS.PARTNER_VIEW);
+    // Never ship the frozen margin to staff without the commercial permission.
     const detail = await applicationDetail(ctx, access.application, {
       includeInternal: true,
+      includeMargin: canSeeCommercials,
     });
 
-    const [customer, product, destination, assignedAgent] = await Promise.all([
+    const [customer, product, destination, assignedAgent, partner] = await Promise.all([
       ctx.db.get(access.application.userId),
       ctx.db.get(access.application.visaProductId),
       ctx.db.get(access.application.destinationId),
       access.application.assignedAgentId
         ? ctx.db.get(access.application.assignedAgentId)
+        : Promise.resolve(null),
+      access.application.partnerId
+        ? ctx.db.get(access.application.partnerId)
         : Promise.resolve(null),
     ]);
 
@@ -1042,8 +1091,35 @@ export const getForAdmin = query({
           .collect()
       : [];
 
+    // The partner's own record of the traveller this booking was made for.
+    // `.take(2)` rather than `.unique()`: a duplicate row must not crash the page.
+    const partnerRows = partner
+      ? await ctx.db
+          .query("partnerCustomers")
+          .withIndex("by_partner_user", (q) =>
+            q.eq("partnerId", partner._id).eq("userId", access.application.userId),
+          )
+          .take(2)
+      : [];
+    const partnerCustomer =
+      partnerRows.find((r) => !r.isArchived) ?? partnerRows[0] ?? null;
+
     return {
       ...detail,
+      partnerCustomer: partnerCustomer
+        ? {
+            _id: partnerCustomer._id,
+            fullName: partnerCustomer.fullName,
+            email: partnerCustomer.email,
+            phone: partnerCustomer.phone,
+            reference: partnerCustomer.reference,
+          }
+        : null,
+      /** null = caller lacks the permission; undefined margin = not frozen yet. */
+      commercials:
+        partner && canSeeCommercials
+          ? { partnerMargin: access.application.partnerMargin ?? null }
+          : null,
       customer: customer
         ? {
             _id: customer._id,
@@ -1059,6 +1135,21 @@ export const getForAdmin = query({
       requirements,
       assignedAgent: assignedAgent
         ? { _id: assignedAgent._id, fullName: assignedAgent.fullName }
+        : null,
+      partner: partner && canSeePartner
+        ? {
+            _id: partner._id,
+            partnerCode: partner.partnerCode,
+            agencyName: partner.agencyName,
+            contactPersonName: partner.contactPersonName,
+            contactEmail: partner.contactEmail,
+            contactPhone: partner.contactPhone,
+            businessType: partner.businessType,
+            city: partner.city,
+            country: partner.country,
+            status: partner.status,
+            bookingCount: partner.bookingCount,
+          }
         : null,
       allowedTransitions:
         ALLOWED_TRANSITIONS[access.application.status as ApplicationStatus] ?? [],

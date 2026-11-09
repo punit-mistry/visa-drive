@@ -31,6 +31,7 @@ import { formatDate, formatDateTime, fullName, maskPassport } from "@/lib/helper
 import { formatMoney } from "@/lib/helpers/pricing";
 import { DOCUMENT_TYPE_MAP } from "@/lib/constants/documents";
 import { APPLICATION_STATUS_CONFIG } from "@/lib/constants/statuses";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -70,7 +71,7 @@ export default function ApplicationDetailPage() {
       }
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not open the document.");
+      toast.error(friendlyError(error, "Could not open the document."));
     } finally {
       setDownloadingId(null);
     }
@@ -114,7 +115,7 @@ export default function ApplicationDetailPage() {
                     await cancel({ applicationId, reason });
                     toast.success("Application cancelled.");
                   } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Could not cancel.");
+                    toast.error(friendlyError(error, "Could not cancel."));
                   }
                 }}
               />

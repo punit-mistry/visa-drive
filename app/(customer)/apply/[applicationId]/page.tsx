@@ -7,7 +7,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import {
-  AlertCircle,
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
@@ -18,7 +17,6 @@ import {
   FileText,
   History,
   Loader2,
-  MapPin,
   Plane,
   Plus,
   Printer,
@@ -42,7 +40,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -73,6 +70,22 @@ import { computePricing, formatMoney } from "@/lib/helpers/pricing";
 import type { PriceBreakdown } from "@/lib/helpers/pricing";
 import { formatDate } from "@/lib/helpers/format";
 import { cn } from "@/lib/utils";
+import {
+  fieldLabel,
+  friendlyError,
+  parseIncompleteApplication,
+  pruneIncomplete,
+  type IncompleteApplication,
+} from "@/lib/helpers/error-messages";
+import {
+  ApplicantForm,
+  fromDateInput,
+  missingFor,
+  startOfToday,
+  toDateInput,
+} from "@/components/application/applicant-form";
+import { IncompleteChecklist } from "@/components/shared/incomplete-checklist";
+import { FieldError } from "@/components/shared/form-field";
 
 /**
  * The booking wizard.
@@ -98,80 +111,8 @@ const STEPS = [
   { id: 4, label: "Review & submit", description: "Confirm before sending" },
 ];
 
-const GENDERS = [
-  { value: "male", label: "Male" },
-  { value: "female", label: "Female" },
-  { value: "other", label: "Other" },
-  { value: "prefer_not_to_say", label: "Prefer not to say" },
-];
-
-const MARITAL_STATUSES = [
-  { value: "single", label: "Single" },
-  { value: "married", label: "Married" },
-  { value: "divorced", label: "Divorced" },
-  { value: "widowed", label: "Widowed" },
-];
-
 function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-}
-
-function toDateInput(ms?: number): string {
-  if (!ms) return "";
-  const date = new Date(ms);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
-}
-
-function fromDateInput(value: string): number | undefined {
-  if (!value) return undefined;
-  const parsed = Date.parse(`${value}T00:00:00`);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function startOfToday(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-interface IncompleteDetails {
-  code: "INCOMPLETE_APPLICATION";
-  problems?: string[];
-  applicants?: Array<{ name: string; missingFields: string[] }>;
-  documents?: Array<{ label: string; applicantName?: string }>;
-}
-
-function readIncomplete(error: unknown): IncompleteDetails | null {
-  if (!error || typeof error !== "object" || !("data" in error)) return null;
-  const data = (error as { data?: unknown }).data;
-  if (!data || typeof data !== "object") return null;
-  const record = data as Record<string, unknown>;
-  if (record.code !== "INCOMPLETE_APPLICATION") return null;
-  return record as unknown as IncompleteDetails;
-}
-
-/** Human labels for the field names the server reports as missing. */
-const FIELD_LABELS: Record<string, string> = {
-  firstName: "First name",
-  lastName: "Last name",
-  middleName: "Middle name",
-  dateOfBirth: "Date of birth",
-  gender: "Gender",
-  nationality: "Nationality",
-  maritalStatus: "Marital status",
-  occupation: "Occupation",
-  email: "Email",
-  phone: "Phone",
-  passportNumber: "Passport number",
-  passportIssueDate: "Passport issue date",
-  passportExpiryDate: "Passport expiry date",
-  passportIssuingCountry: "Passport issuing country",
-  passportIssuingAuthority: "Issuing authority",
-  address: "Address",
-};
-
-function fieldLabel(key: string): string {
-  return FIELD_LABELS[key] ?? key;
 }
 
 type DraftData = FunctionReturnType<typeof api.applications.getDraft>;
@@ -255,7 +196,8 @@ function DraftWizard({
   const [maxReached, setMaxReached] = useState(step);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [incomplete, setIncomplete] = useState<IncompleteDetails | null>(null);
+  const [incomplete, setIncomplete] = useState<IncompleteApplication | null>(null);
+  const [termsTried, setTermsTried] = useState(false);
   const [submitted, setSubmitted] = useState<{
     referenceId: string;
     requiresPayment: boolean;
@@ -288,6 +230,24 @@ function DraftWizard({
 
   const [trip, setTrip] = useState(initialTrip);
   const [termsAccepted, setTermsAccepted] = useState(app.termsAcceptedAt !== undefined);
+
+  // The refused-submit checklist, minus whatever has been fixed since.
+  const liveIncomplete = useMemo(() => {
+    if (!incomplete) return null;
+    const required = new Set(product?.requiredApplicantFields ?? []);
+    return pruneIncomplete(incomplete, {
+      travellers: draft.applicants.map((a) => ({
+        id: a._id,
+        missingKeys: missingFor(a, required),
+      })),
+      uploaded: draft.documents.map((d) => ({
+        documentKey: d.documentKey,
+        applicantId: d.applicantId,
+      })),
+      termsAccepted,
+      travellerCount: app.travellerCount,
+    });
+  }, [incomplete, draft, product, termsAccepted, app.travellerCount]);
   const [dateError, setDateError] = useState<string | null>(null);
 
   // Step 1 is the only step that buffers edits locally, so it is the only one
@@ -339,6 +299,7 @@ function DraftWizard({
       const departure = Date.parse(`${trip.intendedDepartureDate}T00:00:00`);
       if (Number.isFinite(arrival) && Number.isFinite(departure) && departure < arrival) {
         setDateError("Your return date cannot be before your arrival date.");
+        requestAnimationFrame(() => document.getElementById("trip-arrival")?.focus());
         return false;
       }
     }
@@ -359,7 +320,7 @@ function DraftWizard({
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save your progress.",
+        friendlyError(error, "Could not save your progress."),
       );
     } finally {
       setSaving(false);
@@ -374,7 +335,7 @@ function DraftWizard({
       router.push("/dashboard/applications");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save your progress.",
+        friendlyError(error, "Could not save your progress."),
       );
     } finally {
       setSaving(false);
@@ -403,9 +364,7 @@ function DraftWizard({
     } catch (error) {
       setTrip((current) => ({ ...current, travellerCount: previous }));
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not update the number of travellers.",
+        friendlyError(error, "Could not update the number of travellers."),
       );
       throw error;
     }
@@ -425,7 +384,7 @@ function DraftWizard({
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save your progress.",
+        friendlyError(error, "Could not save your progress."),
       );
     } finally {
       setSaving(false);
@@ -434,7 +393,8 @@ function DraftWizard({
 
   async function handleSubmit() {
     if (!termsAccepted) {
-      toast.error("Please accept the terms and conditions first.");
+      setTermsTried(true);
+      document.getElementById("terms")?.focus();
       return;
     }
     setSubmitting(true);
@@ -447,17 +407,17 @@ function DraftWizard({
       });
       return;
     } catch (error) {
-      const details = readIncomplete(error);
+      const details = parseIncompleteApplication(error);
       if (details) {
         setIncomplete(details);
-        if ((details.documents?.length ?? 0) > 0) setStep(3);
-        else if ((details.applicants?.length ?? 0) > 0) setStep(2);
+        if (details.travellers.length > 0 || details.problems.length > 0) setStep(2);
+        else if (details.documents.length > 0) setStep(3);
         else setStep(1);
         window.scrollTo({ top: 0, behavior: "smooth" });
         toast.error("A few things still need your attention.");
       } else {
         toast.error(
-          error instanceof Error ? error.message : "Could not submit the application.",
+          friendlyError(error, "Could not submit the application."),
         );
       }
     } finally {
@@ -514,7 +474,15 @@ function DraftWizard({
         />
       </div>
 
-      {incomplete && <IncompleteNotice details={incomplete} />}
+      {liveIncomplete && (
+        <IncompleteChecklist
+          info={liveIncomplete}
+          onFix={(target) => {
+            setStep(target === "travellers" ? 2 : 3);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
@@ -522,7 +490,14 @@ function DraftWizard({
             <TripStep
               trip={trip}
               setTrip={setTrip}
-              dateError={dateError}
+              dateError={
+                dateError &&
+                trip.intendedArrivalDate &&
+                trip.intendedDepartureDate &&
+                trip.intendedDepartureDate < trip.intendedArrivalDate
+                  ? dateError
+                  : null
+              }
               saving={saving}
               onContinue={() => saveTripDetails(2)}
             />
@@ -562,6 +537,7 @@ function DraftWizard({
               pricing={livePricing}
               termsAccepted={termsAccepted}
               setTermsAccepted={setTermsAccepted}
+              termsError={termsTried && !termsAccepted}
               submitting={submitting}
               busy={busy}
               onEdit={(target) => goToStep(target)}
@@ -626,61 +602,6 @@ function SaveStatus({
       <CheckCircle2 className="size-3.5 text-success" aria-hidden />
       Saved
     </span>
-  );
-}
-
-function IncompleteNotice({ details }: { details: IncompleteDetails }) {
-  return (
-    <div
-      role="alert"
-      className="animate-fade-up rounded-2xl border border-warning/30 bg-warning-soft p-5"
-    >
-      <div className="flex items-start gap-3">
-        <AlertCircle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
-        <div className="min-w-0 space-y-3 text-sm">
-          <p className="font-semibold text-foreground">
-            A few things still need your attention
-          </p>
-
-          {details.problems && details.problems.length > 0 && (
-            <ul className="list-inside list-disc space-y-1 text-muted-foreground">
-              {details.problems.map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
-            </ul>
-          )}
-
-          {details.applicants && details.applicants.length > 0 && (
-            <div>
-              <p className="font-medium text-foreground">Missing traveller details</p>
-              <ul className="mt-1 space-y-1 text-muted-foreground">
-                {details.applicants.map((applicant) => (
-                  <li key={applicant.name}>
-                    <span className="font-medium text-foreground">{applicant.name}</span>
-                    {" — "}
-                    {applicant.missingFields.map(fieldLabel).join(", ")}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {details.documents && details.documents.length > 0 && (
-            <div>
-              <p className="font-medium text-foreground">Missing documents</p>
-              <ul className="mt-1 list-inside list-disc space-y-1 text-muted-foreground">
-                {details.documents.map((document) => (
-                  <li key={`${document.label}-${document.applicantName ?? ""}`}>
-                    {document.label}
-                    {document.applicantName ? ` — ${document.applicantName}` : ""}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -823,8 +744,13 @@ function TripStep({
           description="Approximate dates are fine — tell us if they change later."
         >
           <FieldGrid>
-            <Field label="Intended arrival" error={dateError ?? undefined}>
+            <Field
+              label="Intended arrival"
+              htmlFor="trip-arrival"
+              error={dateError ?? undefined}
+            >
               <DateField
+                id="trip-arrival"
                 value={trip.intendedArrivalDate}
                 onChange={(value) => set("intendedArrivalDate", value)}
                 minDate={today}
@@ -967,102 +893,6 @@ function TravellerCounter({
 /*                            step 2 — travellers                             */
 /* -------------------------------------------------------------------------- */
 
-interface ApplicantDraft {
-  firstName: string;
-  middleName: string;
-  lastName: string;
-  dateOfBirth: string;
-  gender: string;
-  nationality: string;
-  maritalStatus: string;
-  occupation: string;
-  email: string;
-  phone: string;
-  passportNumber: string;
-  passportIssueDate: string;
-  passportExpiryDate: string;
-  passportIssuingCountry: string;
-  passportIssuingAuthority: string;
-  line1: string;
-  line2: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-}
-
-const EMPTY_APPLICANT: ApplicantDraft = {
-  firstName: "",
-  middleName: "",
-  lastName: "",
-  dateOfBirth: "",
-  gender: "",
-  nationality: "",
-  maritalStatus: "",
-  occupation: "",
-  email: "",
-  phone: "",
-  passportNumber: "",
-  passportIssueDate: "",
-  passportExpiryDate: "",
-  passportIssuingCountry: "",
-  passportIssuingAuthority: "",
-  line1: "",
-  line2: "",
-  city: "",
-  state: "",
-  postalCode: "",
-  country: "India",
-};
-
-function applicantToDraft(applicant: Doc<"applicants">): ApplicantDraft {
-  return {
-    firstName: applicant.firstName,
-    middleName: applicant.middleName ?? "",
-    lastName: applicant.lastName,
-    dateOfBirth: toDateInput(applicant.dateOfBirth),
-    gender: applicant.gender ?? "",
-    nationality: applicant.nationality ?? "",
-    maritalStatus: applicant.maritalStatus ?? "",
-    occupation: applicant.occupation ?? "",
-    email: applicant.email ?? "",
-    phone: applicant.phone ?? "",
-    passportNumber: applicant.passportNumber ?? "",
-    passportIssueDate: toDateInput(applicant.passportIssueDate),
-    passportExpiryDate: toDateInput(applicant.passportExpiryDate),
-    passportIssuingCountry: applicant.passportIssuingCountry ?? "",
-    passportIssuingAuthority: applicant.passportIssuingAuthority ?? "",
-    line1: applicant.address?.line1 ?? "",
-    line2: applicant.address?.line2 ?? "",
-    city: applicant.address?.city ?? "",
-    state: applicant.address?.state ?? "",
-    postalCode: applicant.address?.postalCode ?? "",
-    country: applicant.address?.country ?? "India",
-  };
-}
-
-/**
- * The same completeness rule the server applies at submit, run locally so a
- * traveller shows "3 details missing" long before the submit button is
- * pressed. The server remains the authority.
- */
-function missingFor(
-  applicant: Doc<"applicants">,
-  requiredFields: Set<string>,
-): string[] {
-  const fields = new Set<string>(["firstName", "lastName", ...requiredFields]);
-  const missing: string[] = [];
-  for (const field of fields) {
-    const value = (applicant as unknown as Record<string, unknown>)[field];
-    if (value === undefined || value === null) {
-      missing.push(field);
-      continue;
-    }
-    if (typeof value === "string" && value.trim() === "") missing.push(field);
-  }
-  return missing;
-}
-
 function TravellersStep({
   applicationId,
   applicants,
@@ -1156,7 +986,7 @@ function TravellersStep({
       toast.success("Traveller removed.");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not remove this traveller.",
+        friendlyError(error, "Could not remove this traveller."),
       );
     } finally {
       setRemoving(null);
@@ -1352,377 +1182,6 @@ function TravellersStep({
         <StepFooter onBack={onBack} onContinue={onContinue} busy={busy} />
       </div>
     </Card>
-  );
-}
-
-function ApplicantForm({
-  applicationId,
-  applicant,
-  requiredFields,
-  missing,
-  onSaved,
-  footer,
-}: {
-  applicationId: Id<"applications">;
-  applicant?: Doc<"applicants">;
-  requiredFields: Set<string>;
-  missing?: string[];
-  onSaved?: () => void;
-  footer?: React.ReactNode;
-}) {
-  const upsert = useMutation(api.applicants.upsert);
-  const initial = useMemo(
-    () => (applicant ? applicantToDraft(applicant) : EMPTY_APPLICANT),
-    [applicant],
-  );
-  const [values, setValues] = useState<ApplicantDraft>(initial);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
-
-  const genderId = React.useId();
-  const maritalId = React.useId();
-  const today = startOfToday();
-
-  // Another device (or a staff edit) can change the row underneath an open
-  // form. Adopt the new values during render — never in an effect, which
-  // would paint the stale form first — and only when nothing local is at risk.
-  const [syncedFrom, setSyncedFrom] = useState(initial);
-  if (!dirty && syncedFrom !== initial) {
-    setSyncedFrom(initial);
-    setValues(initial);
-  }
-
-  function set<K extends keyof ApplicantDraft>(key: K, value: ApplicantDraft[K]) {
-    setDirty(true);
-    setValues((current) => ({ ...current, [key]: value }));
-  }
-
-  const missingSet = new Set(missing ?? []);
-  const isRequired = (key: string) => requiredFields.has(key);
-
-  async function handleSave(event: React.FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await upsert({
-        applicationId,
-        applicantId: applicant?._id,
-        data: {
-          firstName: values.firstName.trim(),
-          middleName: values.middleName.trim() || undefined,
-          lastName: values.lastName.trim(),
-          dateOfBirth: fromDateInput(values.dateOfBirth),
-          gender:
-            values.gender === "male" ||
-            values.gender === "female" ||
-            values.gender === "other" ||
-            values.gender === "prefer_not_to_say"
-              ? values.gender
-              : undefined,
-          nationality: values.nationality.trim() || undefined,
-          maritalStatus: values.maritalStatus.trim() || undefined,
-          occupation: values.occupation.trim() || undefined,
-          email: values.email.trim() || undefined,
-          phone: values.phone.trim() || undefined,
-          address: values.line1.trim()
-            ? {
-                line1: values.line1.trim(),
-                line2: values.line2.trim() || undefined,
-                city: values.city.trim(),
-                state: values.state.trim() || undefined,
-                postalCode: values.postalCode.trim() || undefined,
-                country: values.country.trim() || "India",
-              }
-            : undefined,
-          passportNumber: values.passportNumber.trim() || undefined,
-          passportIssueDate: fromDateInput(values.passportIssueDate),
-          passportExpiryDate: fromDateInput(values.passportExpiryDate),
-          passportIssuingCountry: values.passportIssuingCountry.trim() || undefined,
-          passportIssuingAuthority:
-            values.passportIssuingAuthority.trim() || undefined,
-        },
-      });
-      setDirty(false);
-      toast.success(applicant ? "Traveller updated." : "Traveller added.");
-      onSaved?.();
-      if (!applicant) setValues(EMPTY_APPLICANT);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not save this traveller.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  /** Flags a field the server has already told us is missing. */
-  const flag = (key: string) =>
-    missingSet.has(key) ? "Required for this visa" : undefined;
-
-  return (
-    <form onSubmit={handleSave} className="space-y-7">
-      <FormSection icon={User} title="Personal details">
-        <FieldGrid>
-          <Field label="First name" required error={flag("firstName")}>
-            <Input
-              value={values.firstName}
-              onChange={(e) => set("firstName", e.target.value)}
-              autoComplete="given-name"
-              required
-            />
-          </Field>
-          <Field label="Last name" required error={flag("lastName")}>
-            <Input
-              value={values.lastName}
-              onChange={(e) => set("lastName", e.target.value)}
-              autoComplete="family-name"
-              required
-            />
-          </Field>
-          <Field label="Middle name" hint="Only if printed in the passport.">
-            <Input
-              value={values.middleName}
-              onChange={(e) => set("middleName", e.target.value)}
-              autoComplete="additional-name"
-            />
-          </Field>
-          <Field
-            label="Date of birth"
-            required={isRequired("dateOfBirth")}
-            error={flag("dateOfBirth")}
-          >
-            <DateField
-              value={values.dateOfBirth}
-              onChange={(value) => set("dateOfBirth", value)}
-              maxDate={today}
-              placeholder="Select date of birth"
-            />
-          </Field>
-          <Field
-            label="Gender"
-            required={isRequired("gender")}
-            htmlFor={genderId}
-            error={flag("gender")}
-          >
-            <Select
-              value={values.gender || undefined}
-              onValueChange={(value) => set("gender", value)}
-            >
-              <SelectTrigger id={genderId} className="h-10 w-full">
-                <SelectValue placeholder="Select…" />
-              </SelectTrigger>
-              <SelectContent>
-                {GENDERS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field
-            label="Nationality"
-            required={isRequired("nationality")}
-            error={flag("nationality")}
-          >
-            <CountrySelect
-              value={values.nationality}
-              onChange={(value) => set("nationality", value)}
-              placeholder="Select nationality"
-            />
-          </Field>
-          <Field
-            label="Marital status"
-            required={isRequired("maritalStatus")}
-            htmlFor={maritalId}
-            error={flag("maritalStatus")}
-          >
-            <Select
-              value={values.maritalStatus || undefined}
-              onValueChange={(value) => set("maritalStatus", value)}
-            >
-              <SelectTrigger id={maritalId} className="h-10 w-full">
-                <SelectValue placeholder="Select…" />
-              </SelectTrigger>
-              <SelectContent>
-                {MARITAL_STATUSES.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field
-            label="Occupation"
-            required={isRequired("occupation")}
-            error={flag("occupation")}
-          >
-            <Input
-              value={values.occupation}
-              onChange={(e) => set("occupation", e.target.value)}
-              placeholder="Software engineer"
-            />
-          </Field>
-          <Field label="Email" required={isRequired("email")} error={flag("email")}>
-            <Input
-              type="email"
-              value={values.email}
-              onChange={(e) => set("email", e.target.value)}
-              autoComplete="email"
-              placeholder="name@example.com"
-            />
-          </Field>
-          <Field label="Phone" required={isRequired("phone")} error={flag("phone")}>
-            <PhoneField
-              value={values.phone}
-              onChange={(value) => set("phone", value)}
-            />
-          </Field>
-        </FieldGrid>
-      </FormSection>
-
-      <Separator />
-
-      <FormSection
-        icon={BadgeCheck}
-        title="Passport"
-        description="Copy these exactly from the passport data page."
-      >
-        <FieldGrid>
-          <Field
-            label="Passport number"
-            required={isRequired("passportNumber")}
-            error={flag("passportNumber")}
-          >
-            <Input
-              value={values.passportNumber}
-              onChange={(e) => set("passportNumber", e.target.value.toUpperCase())}
-              className="uppercase"
-              placeholder="A1234567"
-            />
-          </Field>
-          <Field
-            label="Issuing country"
-            required={isRequired("passportIssuingCountry")}
-            error={flag("passportIssuingCountry")}
-          >
-            <CountrySelect
-              value={values.passportIssuingCountry}
-              onChange={(value) => set("passportIssuingCountry", value)}
-              placeholder="Select issuing country"
-            />
-          </Field>
-          <Field
-            label="Issue date"
-            required={isRequired("passportIssueDate")}
-            error={flag("passportIssueDate")}
-          >
-            <DateField
-              value={values.passportIssueDate}
-              onChange={(value) => set("passportIssueDate", value)}
-              maxDate={today}
-              placeholder="Select issue date"
-            />
-          </Field>
-          <Field
-            label="Expiry date"
-            required={isRequired("passportExpiryDate")}
-            error={flag("passportExpiryDate")}
-            hint="Most consulates want at least six months left."
-          >
-            <DateField
-              value={values.passportExpiryDate}
-              onChange={(value) => set("passportExpiryDate", value)}
-              placeholder="Select expiry date"
-            />
-          </Field>
-          <Field label="Issuing authority">
-            <Input
-              value={values.passportIssuingAuthority}
-              onChange={(e) => set("passportIssuingAuthority", e.target.value)}
-              placeholder="Mumbai"
-            />
-          </Field>
-        </FieldGrid>
-      </FormSection>
-
-      <Separator />
-
-      <FormSection
-        icon={MapPin}
-        title="Residential address"
-        required={isRequired("address")}
-        description={
-          isRequired("address")
-            ? "Required for this visa."
-            : "Optional, but it speeds up document verification."
-        }
-      >
-        <FieldGrid>
-          <Field label="Address line 1" className="sm:col-span-2" error={flag("address")}>
-            <Input
-              value={values.line1}
-              onChange={(e) => set("line1", e.target.value)}
-              autoComplete="address-line1"
-              placeholder="Flat 402, Sea Breeze Apartments"
-            />
-          </Field>
-          <Field label="Address line 2" className="sm:col-span-2">
-            <Input
-              value={values.line2}
-              onChange={(e) => set("line2", e.target.value)}
-              autoComplete="address-line2"
-              placeholder="Linking Road, Khar West"
-            />
-          </Field>
-          <Field label="City">
-            <Input
-              value={values.city}
-              onChange={(e) => set("city", e.target.value)}
-              autoComplete="address-level2"
-              placeholder="Mumbai"
-            />
-          </Field>
-          <Field label="State">
-            <Input
-              value={values.state}
-              onChange={(e) => set("state", e.target.value)}
-              autoComplete="address-level1"
-              placeholder="Maharashtra"
-            />
-          </Field>
-          <Field label="Postal code">
-            <Input
-              value={values.postalCode}
-              onChange={(e) => set("postalCode", e.target.value)}
-              autoComplete="postal-code"
-              inputMode="numeric"
-              placeholder="400052"
-            />
-          </Field>
-          <Field label="Country">
-            <CountrySelect
-              value={values.country}
-              onChange={(value) => set("country", value)}
-              placeholder="Select country"
-            />
-          </Field>
-        </FieldGrid>
-      </FormSection>
-
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-5">
-        {footer}
-        <Button type="submit" disabled={saving || (!dirty && Boolean(applicant))}>
-          {saving ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-          ) : (
-            <Save className="size-4" aria-hidden />
-          )}
-          {applicant ? (dirty ? "Save changes" : "Saved") : "Add traveller"}
-        </Button>
-      </div>
-    </form>
   );
 }
 
@@ -1944,6 +1403,7 @@ function ReviewStep({
   pricing,
   termsAccepted,
   setTermsAccepted,
+  termsError,
   submitting,
   busy,
   onEdit,
@@ -1957,6 +1417,7 @@ function ReviewStep({
   pricing: PriceBreakdown;
   termsAccepted: boolean;
   setTermsAccepted: (value: boolean) => void;
+  termsError: boolean;
   submitting: boolean;
   busy: boolean;
   onEdit: (step: number) => void;
@@ -2145,6 +1606,8 @@ function ReviewStep({
               id="terms"
               checked={termsAccepted}
               onCheckedChange={(value) => setTermsAccepted(value === true)}
+              aria-invalid={termsError ? true : undefined}
+              aria-describedby={termsError ? "terms-error" : undefined}
               className="mt-0.5"
             />
             <div className="space-y-0.5">
@@ -2166,6 +1629,13 @@ function ReviewStep({
             </div>
           </div>
 
+          <FieldError
+            id="terms"
+            message={
+              termsError ? "Please accept the terms and conditions to submit." : undefined
+            }
+          />
+
           {blockers && (
             <p className="text-xs text-muted-foreground">
               You can still submit — we will check everything and come back to you if
@@ -2182,7 +1652,7 @@ function ReviewStep({
               size="lg"
               className="sm:min-w-52"
               onClick={onSubmit}
-              disabled={submitting || !termsAccepted}
+              disabled={submitting}
             >
               {submitting ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />

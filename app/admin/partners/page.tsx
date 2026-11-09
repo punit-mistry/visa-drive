@@ -49,6 +49,7 @@ import {
   type PartnerBusinessType,
   type PartnerStatus,
 } from "@/lib/constants/partners";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 type PartnerRow = Doc<"partners">;
 
@@ -209,7 +210,7 @@ export default function AdminPartnersPage() {
       });
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not export the partners.",
+        friendlyError(error, "Could not export the partners."),
       );
     } finally {
       setExporting(false);

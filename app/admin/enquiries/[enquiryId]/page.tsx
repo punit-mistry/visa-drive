@@ -28,6 +28,8 @@ import { PageHeader } from "@/components/shared/page-header";
 import { LeadStatusBadge } from "@/components/shared/status-badge";
 import { DetailSkeleton, ErrorState } from "@/components/shared/states";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useValidation } from "@/hooks/use-validation";
+import { FieldError } from "@/components/shared/form-field";
 import {
   formatDate,
   formatDateTime,
@@ -40,6 +42,7 @@ import {
   LEAD_STATUS_CONFIG,
   type LeadStatusValue,
 } from "@/lib/constants/statuses";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -108,15 +111,15 @@ function EnquiryDetailView({
   const [followUpInput, setFollowUpInput] = useState(toDateInput(enquiry.followUpAt));
   const [savingFollowUp, setSavingFollowUp] = useState(false);
 
+  const { errors, check } = useValidation(() => ({
+    ...(leadStatus ? {} : { leadStatus: "Choose a lead status." }),
+    ...(leadStatus === "lost" && !lostReason.trim()
+      ? { lostReason: "Record why this lead was lost." }
+      : {}),
+  }));
+
   async function saveStatus() {
-    if (!leadStatus) {
-      toast.error("Choose a lead status first.");
-      return;
-    }
-    if (leadStatus === "lost" && !lostReason.trim()) {
-      toast.error("Please record why this lead was lost.");
-      return;
-    }
+    if (!check() || !leadStatus) return;
     setSavingStatus(true);
     try {
       await updateLeadStatus({
@@ -127,7 +130,7 @@ function EnquiryDetailView({
       toast.success(`Lead moved to ${LEAD_STATUS_CONFIG[leadStatus].label}.`);
       setLostReason("");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update the lead.");
+      toast.error(friendlyError(error, "Could not update the lead."));
     } finally {
       setSavingStatus(false);
     }
@@ -142,7 +145,7 @@ function EnquiryDetailView({
       });
       toast.success(assignee ? "Enquiry assigned." : "Enquiry returned to the shared queue.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not assign this enquiry.");
+      toast.error(friendlyError(error, "Could not assign this enquiry."));
     } finally {
       setSavingAssignee(false);
     }
@@ -154,7 +157,7 @@ function EnquiryDetailView({
       await setFollowUp({ enquiryId, followUpAt: fromDateInput(followUpInput) });
       toast.success(followUpInput ? "Follow-up reminder saved." : "Follow-up reminder cleared.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save the follow-up.");
+      toast.error(friendlyError(error, "Could not save the follow-up."));
     } finally {
       setSavingFollowUp(false);
     }
@@ -308,6 +311,8 @@ function EnquiryDetailView({
                     onChange={(event) =>
                       setLeadStatus(event.target.value as LeadStatusValue | "")
                     }
+                    aria-invalid={errors.leadStatus ? true : undefined}
+                    aria-describedby={errors.leadStatus ? "leadStatus-error" : undefined}
                     className={selectClass}
                   >
                     <option value="">Choose a status</option>
@@ -319,6 +324,7 @@ function EnquiryDetailView({
                       </option>
                     ))}
                   </select>
+                  <FieldError id="leadStatus" message={errors.leadStatus} />
                 </div>
 
                 {leadStatus === "lost" && (
@@ -329,14 +335,17 @@ function EnquiryDetailView({
                       rows={3}
                       value={lostReason}
                       onChange={(event) => setLostReason(event.target.value)}
+                      aria-invalid={errors.lostReason ? true : undefined}
+                      aria-describedby={errors.lostReason ? "lostReason-error" : undefined}
                       placeholder="Budget, timing, chose another provider…"
                     />
+                    <FieldError id="lostReason" message={errors.lostReason} />
                   </div>
                 )}
 
                 <Button
                   onClick={saveStatus}
-                  disabled={savingStatus || !leadStatus}
+                  disabled={savingStatus}
                   className="w-full"
                 >
                   {savingStatus ? (
@@ -389,9 +398,7 @@ function EnquiryDetailView({
                           .then(() => toast.success("Follow-up reminder cleared."))
                           .catch((error: unknown) =>
                             toast.error(
-                              error instanceof Error
-                                ? error.message
-                                : "Could not clear the follow-up.",
+                              friendlyError(error, "Could not clear the follow-up."),
                             ),
                           );
                       }}

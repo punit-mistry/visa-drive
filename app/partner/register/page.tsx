@@ -12,8 +12,7 @@ import {
   PartnerBusinessForm,
   toPartnerBusinessArgs,
   usePartnerBusinessState,
-  validatePartnerBusiness,
-  type PartnerBusinessErrors,
+  usePartnerBusinessValidation,
 } from "@/components/partner/partner-business-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +22,7 @@ import { PartnerStatusBadge } from "@/components/shared/status-badge";
 import { ListSkeleton } from "@/components/shared/states";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import type { PartnerBusinessType, PartnerStatus } from "@/lib/constants/partners";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Register an agency as a VisaDrive partner — and, once registered, the place
@@ -62,7 +62,7 @@ export default function PartnerRegisterPage() {
     partner?._id ?? "new",
   );
 
-  const [errors, setErrors] = useState<PartnerBusinessErrors>({});
+  const { errors, check } = usePartnerBusinessValidation(value, "register");
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -72,9 +72,7 @@ export default function PartnerRegisterPage() {
   const alreadyRegistered = partner !== null;
 
   async function submit() {
-    const found = validatePartnerBusiness(value);
-    setErrors(found);
-    if (Object.keys(found).length > 0) {
+    if (!check()) {
       toast.error("Check the highlighted fields.");
       return;
     }
@@ -101,7 +99,7 @@ export default function PartnerRegisterPage() {
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save your details.",
+        friendlyError(error, "Could not save your details."),
       );
     } finally {
       setBusy(false);

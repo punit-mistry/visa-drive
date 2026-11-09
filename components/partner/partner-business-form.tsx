@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Building2, Contact, MapPin } from "lucide-react";
 
 import { CountrySelect } from "@/components/shared/country-select";
 import { Field, FieldGrid, FormSection } from "@/components/shared/form-field";
 import { PhoneField } from "@/components/shared/phone-field";
 import { Input } from "@/components/ui/input";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
 import {
   PARTNER_BUSINESS_TYPES,
   PARTNER_BUSINESS_TYPE_LABELS,
@@ -100,6 +101,49 @@ export function validatePartnerBusiness(
   }
 
   return errors;
+}
+
+/** Control-id suffix per validated field, in the order they appear on screen. */
+const VALIDATED_FIELDS: [keyof PartnerBusinessValue, string][] = [
+  ["agencyName", "agency"],
+  ["gstNumber", "gst"],
+  ["website", "website"],
+  ["addressLine1", "line1"],
+  ["city", "city"],
+  ["country", "country"],
+  ["contactPersonName", "contact"],
+  ["contactEmail", "email"],
+  ["contactPhone", "phone"],
+];
+
+/**
+ * Validate-on-click for any form that hosts the business block: `check()` on
+ * Save reveals every error, focuses the first, and the errors then clear as
+ * each field is fixed. `errors` plugs straight into `PartnerBusinessForm`.
+ */
+export function usePartnerBusinessValidation(
+  value: PartnerBusinessValue,
+  idPrefix: string,
+) {
+  const validate = useCallback((): FieldErrors => {
+    const found = validatePartnerBusiness(value);
+    const byId: FieldErrors = {};
+    for (const [key, suffix] of VALIDATED_FIELDS) {
+      const message = found[key];
+      if (message) byId[`${idPrefix}-${suffix}`] = message;
+    }
+    return byId;
+  }, [value, idPrefix]);
+
+  const { errors: byId, check, reset } = useValidation(validate);
+
+  const errors: PartnerBusinessErrors = {};
+  for (const [key, suffix] of VALIDATED_FIELDS) {
+    const message = byId[`${idPrefix}-${suffix}`];
+    if (message) errors[key] = message;
+  }
+
+  return { errors, check, reset };
 }
 
 /** The payload shape the Convex mutations take. */

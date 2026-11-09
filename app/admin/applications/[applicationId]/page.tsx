@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Download,
   Eye,
+  Handshake,
   Loader2,
   Mail,
   MessageCircle,
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,11 +36,13 @@ import {
   ApplicationStatusBadge,
   DocumentStatusBadge,
   PaymentRecordStatusBadge,
+  PartnerStatusBadge,
   PaymentStatusBadge,
 } from "@/components/shared/status-badge";
 import { StatusTimeline } from "@/components/shared/status-timeline";
 import { DetailSkeleton, EmptyState, ErrorState } from "@/components/shared/states";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
 import {
   formatDate,
   formatDateTime,
@@ -54,6 +58,12 @@ import {
   type ApplicationStatus,
   type PaymentStatusValue,
 } from "@/lib/constants/statuses";
+import { friendlyError } from "@/lib/helpers/error-messages";
+import {
+  PARTNER_BUSINESS_TYPE_LABELS,
+  type PartnerBusinessType,
+  type PartnerStatus,
+} from "@/lib/constants/partners";
 
 function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -87,6 +97,10 @@ export default function AdminApplicationDetailPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [viewerId, setViewerId] = useState<Id<"documents"> | null>(null);
 
+  const statusValidation = useValidation((): FieldErrors =>
+    nextStatus ? {} : { nextStatus: "Choose the status to move this application to." },
+  );
+
   if (detail === undefined || userLoading) return <DetailSkeleton />;
   if (detail === null) {
     return (
@@ -104,10 +118,7 @@ export default function AdminApplicationDetailPage() {
     : (detail.allowedTransitions as ApplicationStatus[]);
 
   async function saveStatus() {
-    if (!nextStatus) {
-      toast.error("Choose the status to move this application to.");
-      return;
-    }
+    if (!statusValidation.check() || !nextStatus) return;
     setSavingStatus(true);
     try {
       await updateStatus({
@@ -122,7 +133,7 @@ export default function AdminApplicationDetailPage() {
       setNote("");
       setForce(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update the status.");
+      toast.error(friendlyError(error, "Could not update the status."));
     } finally {
       setSavingStatus(false);
     }
@@ -137,7 +148,7 @@ export default function AdminApplicationDetailPage() {
       });
       toast.success(agentId ? "Application assigned." : "Application unassigned.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not reassign this application.");
+      toast.error(friendlyError(error, "Could not reassign this application."));
     } finally {
       setSavingAgent(false);
     }
@@ -153,7 +164,7 @@ export default function AdminApplicationDetailPage() {
       }
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not open the document.");
+      toast.error(friendlyError(error, "Could not open the document."));
     } finally {
       setDownloadingId(null);
     }
@@ -179,6 +190,19 @@ export default function AdminApplicationDetailPage() {
       />
 
       <div className="flex flex-wrap items-center gap-2">
+        {detail.partner && (
+          <Badge asChild variant="outline" className="h-6 max-w-full gap-1.5 px-2.5">
+            <Link
+              href={`/admin/partners/${detail.partner._id}`}
+              aria-label={`B2B booking from partner ${detail.partner.agencyName}. Open partner.`}
+            >
+              <Handshake aria-hidden />
+              <span className="font-semibold">B2B</span>
+              <span aria-hidden>·</span>
+              <span className="truncate">{detail.partner.agencyName}</span>
+            </Link>
+          </Badge>
+        )}
         <ApplicationStatusBadge status={currentStatus} />
         <PaymentStatusBadge status={application.paymentStatus as PaymentStatusValue} />
         <span className="text-xs text-muted-foreground">
@@ -459,6 +483,10 @@ export default function AdminApplicationDetailPage() {
                     onChange={(event) =>
                       setNextStatus(event.target.value as ApplicationStatus | "")
                     }
+                    aria-invalid={statusValidation.errors.nextStatus ? true : undefined}
+                    aria-describedby={
+                      statusValidation.errors.nextStatus ? "nextStatus-error" : undefined
+                    }
                     className={selectClass}
                   >
                     <option value="">Choose a status</option>
@@ -468,6 +496,11 @@ export default function AdminApplicationDetailPage() {
                       </option>
                     ))}
                   </select>
+                  {statusValidation.errors.nextStatus && (
+                    <p id="nextStatus-error" role="alert" className="text-xs text-destructive">
+                      {statusValidation.errors.nextStatus}
+                    </p>
+                  )}
                   {transitions.length === 0 && !force && (
                     <p className="text-xs text-muted-foreground">
                       This status has no normal transitions. Enable an override below
@@ -517,7 +550,7 @@ export default function AdminApplicationDetailPage() {
 
                 <Button
                   onClick={saveStatus}
-                  disabled={savingStatus || !nextStatus}
+                  disabled={savingStatus}
                   className="w-full"
                 >
                   {savingStatus ? (
@@ -655,6 +688,132 @@ export default function AdminApplicationDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {detail.partner && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Handshake className="size-4" aria-hidden />
+                  Partner (B2B)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div>
+                  <Link
+                    href={`/admin/partners/${detail.partner._id}`}
+                    className="font-medium text-primary hover:underline focus-brand"
+                  >
+                    {detail.partner.agencyName}
+                  </Link>
+                  <p className="text-xs text-muted-foreground">
+                    {detail.partner.partnerCode} ·{" "}
+                    {PARTNER_BUSINESS_TYPE_LABELS[
+                      detail.partner.businessType as PartnerBusinessType
+                    ] ?? detail.partner.businessType}{" "}
+                    · {detail.partner.city}, {detail.partner.country}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Status</span>
+                  <PartnerStatusBadge status={detail.partner.status as PartnerStatus} />
+                </div>
+                <Row label="Contact" value={detail.partner.contactPersonName} />
+                <Row
+                  label="Email"
+                  value={
+                    <a
+                      href={`mailto:${detail.partner.contactEmail}`}
+                      className="text-primary hover:underline focus-brand"
+                    >
+                      {detail.partner.contactEmail}
+                    </a>
+                  }
+                />
+                <Row
+                  label="Phone"
+                  value={
+                    <a
+                      href={`tel:${detail.partner.contactPhone}`}
+                      className="text-primary hover:underline focus-brand"
+                    >
+                      {formatPhone(detail.partner.contactPhone)}
+                    </a>
+                  }
+                />
+                <Row label="Total bookings" value={String(detail.partner.bookingCount)} />
+
+                {detail.partnerCustomer && (
+                  <>
+                    <Separator />
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Partner&apos;s customer
+                    </p>
+                    <p className="font-medium">{detail.partnerCustomer.fullName}</p>
+                    <p className="text-muted-foreground">
+                      {detail.partnerCustomer.email}
+                      {detail.partnerCustomer.phone
+                        ? ` · ${formatPhone(detail.partnerCustomer.phone)}`
+                        : ""}
+                    </p>
+                    {detail.partnerCustomer.reference && (
+                      <Row
+                        label="Partner reference"
+                        value={detail.partnerCustomer.reference}
+                      />
+                    )}
+                  </>
+                )}
+
+                <Separator />
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Commercials
+                </p>
+                {detail.commercials === null ? (
+                  <p className="text-muted-foreground">
+                    You don&apos;t have access to commercial details.
+                  </p>
+                ) : detail.commercials.partnerMargin ? (
+                  <>
+                    <Row
+                      label="Base price (partner pays)"
+                      value={formatMoney(
+                        detail.commercials.partnerMargin.basePrice,
+                        detail.commercials.partnerMargin.currency,
+                      )}
+                    />
+                    <Row
+                      label="Partner price (customer pays)"
+                      value={formatMoney(
+                        detail.commercials.partnerMargin.partnerPrice,
+                        detail.commercials.partnerMargin.currency,
+                      )}
+                    />
+                    <Row
+                      label={`Margin (${detail.commercials.partnerMargin.marginPercent}%)`}
+                      value={formatMoney(
+                        detail.commercials.partnerMargin.marginAmount,
+                        detail.commercials.partnerMargin.currency,
+                      )}
+                      strong
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Frozen at submission. Margin percent is of the base price.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Not frozen yet — set when the booking is submitted.
+                  </p>
+                )}
+
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <Link href={`/admin/partners/${detail.partner._id}`}>
+                    View all bookings from this partner
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {detail.requirements.length > 0 && (
             <Card>

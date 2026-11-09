@@ -63,7 +63,10 @@ export function ConfirmDialog({
     // and a slow network cannot be mistaken for a no-op.
     event.preventDefault();
     setTouched(true);
-    if (reasonInvalid) return;
+    if (reasonInvalid) {
+      document.getElementById("confirm-reason")?.focus();
+      return;
+    }
 
     try {
       setPending(true);
@@ -100,9 +103,12 @@ export function ConfirmDialog({
               placeholder={reasonPlaceholder}
               rows={3}
               aria-invalid={touched && reasonInvalid}
+              aria-describedby={
+                touched && reasonInvalid ? "confirm-reason-error" : undefined
+              }
             />
             {touched && reasonInvalid && (
-              <p className="text-xs text-brand">
+              <p id="confirm-reason-error" role="alert" className="text-xs text-destructive">
                 Please give a reason of at least 3 characters.
               </p>
             )}
@@ -113,7 +119,7 @@ export function ConfirmDialog({
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={pending || (touched && reasonInvalid)}
+            disabled={pending}
             className={cn(
               destructive &&
                 "bg-destructive text-destructive-foreground hover:bg-brand-deep",

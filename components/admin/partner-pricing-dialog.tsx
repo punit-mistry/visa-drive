@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useMutation } from "convex/react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/shared/form-field";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
 import { formatMoney, parseMoney } from "@/lib/helpers/pricing";
 import { computePartnerPricing } from "@/lib/helpers/partner-pricing";
 import {
@@ -28,6 +29,7 @@ import {
   PARTNER_PRICING_MODE_LABELS,
   type PartnerPricingMode,
 } from "@/lib/constants/partners";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Set one partner's price for one visa service.
@@ -97,6 +99,29 @@ export function PartnerPricingDialog({
     setNote(existing?.note ?? "");
   }
 
+  // Hooks stay above the early return below.
+  const validate = useCallback((): FieldErrors => {
+    const value =
+      mode === "markup_percent"
+        ? Number.parseFloat(raw)
+        : (parseMoney(raw) ?? Number.NaN);
+    if (!Number.isFinite(value) || value < 0) {
+      return {
+        "pricing-value":
+          mode === "markup_percent"
+            ? "Enter a markup of zero or more."
+            : "Enter an amount of zero or more.",
+      };
+    }
+    if (mode === "markup_percent" && value > MAX_MARKUP_PERCENT) {
+      return {
+        "pricing-value": `A markup cannot exceed ${MAX_MARKUP_PERCENT}%.`,
+      };
+    }
+    return {};
+  }, [mode, raw]);
+  const { errors, check } = useValidation(validate, targetKey ?? "none");
+
   if (!target) {
     return (
       <Dialog open={false} onOpenChange={() => onOpenChange(null)}>
@@ -117,14 +142,7 @@ export function PartnerPricingDialog({
     : computePartnerPricing(target.product, 1, null);
 
   async function save() {
-    if (!valid) {
-      toast.error("Enter a positive number.");
-      return;
-    }
-    if (mode === "markup_percent" && numeric > MAX_MARKUP_PERCENT) {
-      toast.error(`A markup cannot exceed ${MAX_MARKUP_PERCENT}%.`);
-      return;
-    }
+    if (!check()) return;
 
     setBusy(true);
     try {
@@ -144,7 +162,7 @@ export function PartnerPricingDialog({
       onOpenChange(null);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save the price.",
+        friendlyError(error, "Could not save the price."),
       );
     } finally {
       setBusy(false);
@@ -159,7 +177,7 @@ export function PartnerPricingDialog({
       onOpenChange(null);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not clear the price.",
+        friendlyError(error, "Could not clear the price."),
       );
     } finally {
       setBusy(false);
@@ -200,6 +218,7 @@ export function PartnerPricingDialog({
             label={mode === "markup_percent" ? "Markup" : "Amount per traveller"}
             htmlFor="pricing-value"
             required
+            error={errors["pricing-value"]}
           >
             <div className="flex items-center gap-2">
               {mode !== "markup_percent" && (
@@ -207,6 +226,8 @@ export function PartnerPricingDialog({
               )}
               <Input
                 id="pricing-value"
+                aria-invalid={errors["pricing-value"] ? true : undefined}
+                aria-describedby={errors["pricing-value"] ? "pricing-value-error" : undefined}
                 inputMode="decimal"
                 value={raw}
                 onChange={(e) => setRaw(e.target.value)}
@@ -284,7 +305,7 @@ export function PartnerPricingDialog({
             >
               Cancel
             </Button>
-            <Button onClick={save} disabled={busy || !valid}>
+            <Button onClick={save} disabled={busy}>
               {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
               Save price
             </Button>

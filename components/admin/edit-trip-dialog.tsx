@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useMutation } from "convex/react";
 import { Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +23,10 @@ import { CountrySelect } from "@/components/shared/country-select";
 import { DateField } from "@/components/shared/date-field";
 import { Field, FieldGrid } from "@/components/shared/form-field";
 import { PhoneField } from "@/components/shared/phone-field";
+import { useValidation, zodMessage, type FieldErrors } from "@/hooks/use-validation";
 import { toDateInput, fromDateInput } from "@/lib/helpers/format";
+import { phoneField } from "@/lib/validators/forms";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Correct the trip details on a booking the customer can no longer edit.
@@ -54,6 +57,25 @@ export function EditTripDialog({
   const [rejectionNote, setRejectionNote] = useState("");
   const [note, setNote] = useState("");
 
+  const validate = useCallback((): FieldErrors => {
+    const errors: FieldErrors = {};
+    const from = fromDateInput(arrival);
+    const to = fromDateInput(departure);
+    if (from !== undefined && to !== undefined && to <= from) {
+      errors["trip-departure"] = "The return date must be after the arrival date.";
+    }
+    if (phone.trim()) {
+      const message = zodMessage(phoneField, phone);
+      if (message) errors["trip-phone"] = message;
+    }
+    if (rejection === "yes" && rejectionNote.trim().length < 10) {
+      errors["trip-rejection-note"] =
+        "Describe the previous rejection — at least 10 characters.";
+    }
+    return errors;
+  }, [arrival, departure, phone, rejection, rejectionNote]);
+  const { errors, check, reset: resetValidation } = useValidation(validate);
+
   function hydrate() {
     setDepartureCountry(application.departureCountry ?? "");
     setTravelPurpose(application.travelPurpose ?? "");
@@ -70,11 +92,13 @@ export function EditTripDialog({
     setRejectionNote(application.previousVisaRejectionNote ?? "");
     setNote("");
     setError(null);
+    resetValidation();
   }
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (saving) return;
+    if (!check()) return;
 
     setSaving(true);
     setError(null);
@@ -100,7 +124,7 @@ export function EditTripDialog({
       setOpen(false);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not save those changes.",
+        friendlyError(caught, "Could not save those changes."),
       );
     } finally {
       setSaving(false);
@@ -123,7 +147,7 @@ export function EditTripDialog({
       </DialogTrigger>
 
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <form onSubmit={save}>
+        <form onSubmit={save} noValidate>
           <DialogHeader>
             <DialogTitle>Edit trip details</DialogTitle>
             <DialogDescription>
@@ -137,7 +161,7 @@ export function EditTripDialog({
               <Field label="Arrival date" htmlFor="trip-arrival">
                 <DateField id="trip-arrival" value={arrival} onChange={setArrival} />
               </Field>
-              <Field label="Return date" htmlFor="trip-departure">
+              <Field label="Return date" htmlFor="trip-departure" error={errors["trip-departure"]}>
                 <DateField
                   id="trip-departure"
                   value={departure}
@@ -163,8 +187,12 @@ export function EditTripDialog({
               </Field>
             </FieldGrid>
 
-            <Field label="Contact phone for this booking">
-              <PhoneField value={phone} onChange={setPhone} />
+            <Field
+              label="Contact phone for this booking"
+              htmlFor="trip-phone"
+              error={errors["trip-phone"]}
+            >
+              <PhoneField id="trip-phone" value={phone} onChange={setPhone} />
             </Field>
 
             <Field label="Previous visa rejection" htmlFor="trip-rejection">
@@ -185,9 +213,12 @@ export function EditTripDialog({
             {rejection === "yes" && (
               <Field
                 label="Rejection details"
+                htmlFor="trip-rejection-note"
+                error={errors["trip-rejection-note"]}
                 hint="Country, year and the reason given, as far as the customer knows it."
               >
                 <Textarea
+                  id="trip-rejection-note"
                   value={rejectionNote}
                   onChange={(event) => setRejectionNote(event.target.value)}
                   rows={3}

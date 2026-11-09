@@ -8,6 +8,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { PendingUpload } from "@/components/shared/file-dropzone";
 import { validateFile } from "@/lib/constants/documents";
+import { friendlyError } from "@/lib/helpers/error-messages";
+import { UserFacingError } from "@/lib/helpers/error-messages";
 
 /**
  * Uploads a file to Convex File Storage and records it against an application.
@@ -104,7 +106,7 @@ export function useDocumentUpload({
         return documentId as Id<"documents">;
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Upload failed. Please try again.";
+          friendlyError(error, "Upload failed. Please try again.");
         patchUpload(localId, { status: "error", error: message });
         toast.error(`Could not upload ${file.name}`, { description: message });
         return null;
@@ -127,6 +129,7 @@ export function useDocumentUpload({
       options: {
         documentKey: string;
         label: string;
+        applicantId?: Id<"applicants">;
         constraints?: { allowedMimeTypes?: string[]; maxSizeBytes?: number };
       },
     ) => {
@@ -171,21 +174,21 @@ function putWithProgress(
         try {
           const { storageId } = JSON.parse(xhr.responseText);
           if (!storageId) {
-            reject(new Error("The storage service did not return a file id."));
+            reject(new UserFacingError("The upload did not finish. Please try again."));
             return;
           }
           resolve(storageId);
         } catch {
-          reject(new Error("Unexpected response from the storage service."));
+          reject(new UserFacingError("The upload did not finish. Please try again."));
         }
       } else {
-        reject(new Error(`Upload failed (${xhr.status}). Please try again.`));
+        reject(new UserFacingError("The upload did not go through. Please try again."));
       }
     };
 
     xhr.onerror = () =>
-      reject(new Error("Network error during upload. Check your connection."));
-    xhr.ontimeout = () => reject(new Error("The upload timed out."));
+      reject(new UserFacingError("The upload was interrupted. Check your connection and try again."));
+    xhr.ontimeout = () => reject(new UserFacingError("The upload took too long. Check your connection and try again."));
 
     xhr.timeout = 120_000;
     xhr.send(file);

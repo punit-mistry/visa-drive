@@ -12,8 +12,7 @@ import {
   PartnerBusinessForm,
   toPartnerBusinessArgs,
   usePartnerBusinessState,
-  validatePartnerBusiness,
-  type PartnerBusinessErrors,
+  usePartnerBusinessValidation,
 } from "@/components/partner/partner-business-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +29,7 @@ import {
   type PartnerBusinessType,
   type PartnerStatus,
 } from "@/lib/constants/partners";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 export default function PartnerProfilePage() {
   const profile = useQuery(api.partners.myProfile, {});
@@ -60,7 +60,7 @@ export default function PartnerProfilePage() {
     partner?._id ?? null,
   );
 
-  const [errors, setErrors] = useState<PartnerBusinessErrors>({});
+  const { errors, check } = usePartnerBusinessValidation(value, "profile");
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -70,9 +70,7 @@ export default function PartnerProfilePage() {
   if (!partner) return null;
 
   async function save() {
-    const found = validatePartnerBusiness(value);
-    setErrors(found);
-    if (Object.keys(found).length > 0) {
+    if (!check()) {
       toast.error("Check the highlighted fields.");
       return;
     }
@@ -88,7 +86,7 @@ export default function PartnerProfilePage() {
       });
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save your details.",
+        friendlyError(error, "Could not save your details."),
       );
     } finally {
       setBusy(false);

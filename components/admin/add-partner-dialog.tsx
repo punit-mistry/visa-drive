@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { Loader2, Plus } from "lucide-react";
@@ -26,13 +26,14 @@ import {
   EMPTY_PARTNER_BUSINESS,
   PartnerBusinessForm,
   toPartnerBusinessArgs,
-  validatePartnerBusiness,
-  type PartnerBusinessErrors,
+  usePartnerBusinessValidation,
   type PartnerBusinessValue,
 } from "@/components/partner/partner-business-form";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
 import { PERMISSIONS } from "@/lib/constants/roles";
 import { MAX_MARKUP_PERCENT } from "@/lib/constants/partners";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * Register a partner from the CRM — for the agency that phoned in rather than
@@ -51,35 +52,39 @@ export function AddPartnerDialog({ trigger }: { trigger?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [value, setValue] = useState<PartnerBusinessValue>(EMPTY_PARTNER_BUSINESS);
-  const [errors, setErrors] = useState<PartnerBusinessErrors>({});
   const [approveNow, setApproveNow] = useState(false);
   const [markup, setMarkup] = useState("0");
 
+  const business = usePartnerBusinessValidation(value, "add-partner");
+  const markupPercent = Number.parseFloat(markup);
+  const validateMarkup = useCallback((): FieldErrors => {
+    const bad =
+      markup.trim() !== "" &&
+      (!Number.isFinite(markupPercent) ||
+        markupPercent < 0 ||
+        markupPercent > MAX_MARKUP_PERCENT);
+    return bad
+      ? {
+          "add-partner-markup": `Enter a markup between 0 and ${MAX_MARKUP_PERCENT}%.`,
+        }
+      : {};
+  }, [markup, markupPercent]);
+  const markupCheck = useValidation(validateMarkup);
+
   function reset() {
     setValue(EMPTY_PARTNER_BUSINESS);
-    setErrors({});
+    business.reset();
+    markupCheck.reset();
     setApproveNow(false);
     setMarkup("0");
   }
 
   async function submit() {
-    const found = validatePartnerBusiness(value);
-    setErrors(found);
-    if (Object.keys(found).length > 0) {
+    if (!business.check()) {
       toast.error("Check the highlighted fields.");
       return;
     }
-
-    const markupPercent = Number.parseFloat(markup);
-    if (
-      markup.trim() !== "" &&
-      (!Number.isFinite(markupPercent) ||
-        markupPercent < 0 ||
-        markupPercent > MAX_MARKUP_PERCENT)
-    ) {
-      toast.error(`The default markup must be between 0 and ${MAX_MARKUP_PERCENT}%.`);
-      return;
-    }
+    if (!markupCheck.check()) return;
 
     setBusy(true);
     try {
@@ -100,7 +105,7 @@ export function AddPartnerDialog({ trigger }: { trigger?: ReactNode }) {
       router.push(`/admin/partners/${result.partnerId}`);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not register the partner.";
+        friendlyError(error, "Could not register the partner.");
       toast.error(message);
     } finally {
       setBusy(false);
@@ -138,7 +143,7 @@ export function AddPartnerDialog({ trigger }: { trigger?: ReactNode }) {
           <PartnerBusinessForm
             value={value}
             onChange={setValue}
-            errors={errors}
+            errors={business.errors}
             disabled={busy}
             idPrefix="add-partner"
           />
@@ -149,11 +154,18 @@ export function AddPartnerDialog({ trigger }: { trigger?: ReactNode }) {
             <Field
               label="Default markup"
               htmlFor="add-partner-markup"
+              error={markupCheck.errors["add-partner-markup"]}
               hint="Applied to every service that has no price of its own. You can set per-service prices later."
             >
               <div className="flex items-center gap-2">
                 <Input
                   id="add-partner-markup"
+                  aria-invalid={markupCheck.errors["add-partner-markup"] ? true : undefined}
+                  aria-describedby={
+                    markupCheck.errors["add-partner-markup"]
+                      ? "add-partner-markup-error"
+                      : undefined
+                  }
                   type="number"
                   inputMode="decimal"
                   min={0}

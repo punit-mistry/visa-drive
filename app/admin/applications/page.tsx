@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePaginatedQuery } from "convex/react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { FileText, Search, X } from "lucide-react";
+import { FileText, Handshake, Search, X } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,6 +32,7 @@ import {
 
 type AdminApplicationRow = Doc<"applications"> & {
   assignedAgentName: string | null;
+  partnerName: string | null;
 };
 
 const selectClass =
@@ -62,7 +64,24 @@ export default function AdminApplicationsPage() {
         accessorKey: "referenceId",
         header: "Reference",
         cell: ({ row }) => (
-          <span className="font-medium tabular-nums">{row.original.referenceId}</span>
+          <div className="min-w-0 space-y-1">
+            <span className="font-medium tabular-nums">{row.original.referenceId}</span>
+            {row.original.partnerId && (
+              <Badge
+                variant="outline"
+                className="flex max-w-40 gap-1 px-1.5 py-0 text-[11px]"
+                title={`B2B booking via ${row.original.partnerName ?? "partner"}`}
+              >
+                <Handshake aria-hidden />
+                <span className="font-semibold">B2B</span>
+                {row.original.partnerName && (
+                  <span className="truncate font-normal text-muted-foreground">
+                    · {row.original.partnerName}
+                  </span>
+                )}
+              </Badge>
+            )}
+          </div>
         ),
       },
       {

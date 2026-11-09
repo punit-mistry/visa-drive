@@ -106,6 +106,7 @@ export function DateField({
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-describedby={describedBy}
+          {...(invalid ? { "aria-invalid": true } : {})}
           data-invalid={invalid ? "" : undefined}
           className={cn(
             "flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm shadow-xs transition-[color,box-shadow,border-color] outline-none",

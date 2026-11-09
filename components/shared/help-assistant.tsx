@@ -30,6 +30,7 @@ import {
 } from "@/lib/constants/help";
 import { CUSTOMER_TOUR, STAFF_TOUR, tourKey, type Tour } from "@/lib/constants/tours";
 import { cn } from "@/lib/utils";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * The help assistant, and the host for the guided tour.
@@ -220,11 +221,7 @@ export function HelpAssistant({ surface }: { surface: "customer" | "staff" }) {
       setEscalated(result.referenceId);
       toast.success("Sent to the VisaDrive team.");
     } catch (error) {
-      const message =
-        error && typeof error === "object" && "data" in error
-          ? ((error as { data?: { message?: string } }).data?.message ?? null)
-          : null;
-      toast.error(message ?? "Could not send your question. Please try again.");
+      toast.error(friendlyError(error, "Could not send your question. Please try again."));
     } finally {
       setEscalating(false);
     }

@@ -17,6 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Field, FieldGrid } from "@/components/shared/form-field";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useValidation, zodMessage, type FieldErrors } from "@/hooks/use-validation";
+import { emailField } from "@/lib/validators/forms";
 import {
   ROLE_DESCRIPTIONS,
   ROLE_LABELS,
@@ -78,6 +80,34 @@ export function AddStaffDialog() {
   const [department, setDepartment] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
 
+  const { errors, check, reset: resetValidation } = useValidation(
+    (): FieldErrors => {
+      const found: FieldErrors = {};
+      if (fullName.trim().length < 2) {
+        found["staff-name"] = "Enter their full name.";
+      } else if (fullName.trim().length > 120) {
+        found["staff-name"] = "Keep the name under 120 characters.";
+      }
+      const emailError = zodMessage(emailField, email);
+      if (emailError) found["staff-email"] = emailError;
+      else if (email.trim().length > 160) {
+        found["staff-email"] = "Keep the email under 160 characters.";
+      }
+      if (password.trim() && password.trim().length < 8) {
+        found["staff-password"] = "Use at least 8 characters, or leave it blank.";
+      } else if (password.trim().length > 100) {
+        found["staff-password"] = "Keep the password under 100 characters.";
+      }
+      if (designation.trim().length > 120) {
+        found["staff-designation"] = "Keep this under 120 characters.";
+      }
+      if (department.trim().length > 120) {
+        found["staff-department"] = "Keep this under 120 characters.";
+      }
+      return found;
+    },
+  );
+
   if (grantable.length === 0) return null;
 
   function reset() {
@@ -92,11 +122,13 @@ export function AddStaffDialog() {
     setError(null);
     setShowPassword(false);
     setCopied(false);
+    resetValidation();
   }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
+    if (!check()) return;
 
     setBusy(true);
     setError(null);
@@ -261,7 +293,7 @@ export function AddStaffDialog() {
             </DialogFooter>
           </>
         ) : (
-          <form onSubmit={submit}>
+          <form onSubmit={submit} noValidate>
             <DialogHeader>
               <DialogTitle>Add a staff member</DialogTitle>
               <DialogDescription>
@@ -271,25 +303,30 @@ export function AddStaffDialog() {
 
             <div className="space-y-5 py-4">
               <FieldGrid>
-                <Field label="Full name" required>
+                <Field label="Full name" required htmlFor="staff-name" error={errors["staff-name"]}>
                   <Input
+                    id="staff-name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Asha Mehta"
                     autoComplete="off"
-                    required
-                    minLength={2}
                   />
                 </Field>
 
-                <Field label="Work email" required hint="This is their sign-in.">
+                <Field
+                  label="Work email"
+                  required
+                  htmlFor="staff-email"
+                  hint="This is their sign-in."
+                  error={errors["staff-email"]}
+                >
                   <Input
+                    id="staff-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="asha@visadrive.in"
                     autoComplete="off"
-                    required
                   />
                 </Field>
               </FieldGrid>
@@ -316,16 +353,22 @@ export function AddStaffDialog() {
 
               <Field
                 label="Password"
+                htmlFor="staff-password"
+                error={errors["staff-password"]}
                 hint="Leave blank to generate a strong one. They should change it after signing in."
               >
                 <div className="flex gap-2">
                   <Input
+                    id="staff-password"
+                    aria-invalid={errors["staff-password"] ? true : undefined}
+                    aria-describedby={
+                      errors["staff-password"] ? "staff-password-error" : undefined
+                    }
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Generated automatically"
                     autoComplete="new-password"
-                    minLength={8}
                   />
                   <Button
                     type="button"
@@ -356,15 +399,27 @@ export function AddStaffDialog() {
               </Field>
 
               <FieldGrid>
-                <Field label="Designation" hint="Optional">
+                <Field
+                  label="Designation"
+                  hint="Optional"
+                  htmlFor="staff-designation"
+                  error={errors["staff-designation"]}
+                >
                   <Input
+                    id="staff-designation"
                     value={designation}
                     onChange={(e) => setDesignation(e.target.value)}
                     placeholder="Senior Visa Consultant"
                   />
                 </Field>
-                <Field label="Department" hint="Optional">
+                <Field
+                  label="Department"
+                  hint="Optional"
+                  htmlFor="staff-department"
+                  error={errors["staff-department"]}
+                >
                   <Input
+                    id="staff-department"
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
                     placeholder="Processing"

@@ -93,15 +93,15 @@ same change.
 | --- | --- | --- |
 | `createDraft` | mutation | `{ visaProductId, travellerCount }` → `{ applicationId, referenceId }`. |
 | `saveDraftStep` | mutation | Autosave. `{ applicationId, step, patch }`. Owner only. |
-| `getDraft` | query | Owner only. Full wizard state: application + applicants + documents + product + requirements + destination. |
-| `listMyDrafts` | query | Owner only. |
+| `getDraft` | query | Owner, or the partner who placed a B2B booking. Full wizard state: application + applicants + documents + product + requirements + destination. `application.partnerMargin` is present only for the partner. |
+| `listMyDrafts` | query | Owner only. Never includes `partnerMargin`. |
 | `submit` | mutation | Validates completeness, freezes `pricing`, writes `statusHistory`, notifies. |
-| `listMine` | query | Paginated. Owner only. |
-| `getMine` | query | Owner only. Application + applicants + documents + timeline + payments. |
-| `getByReference` | query | Owner-or-staff. For the confirmation page. |
+| `listMine` | query | Paginated. Owner only. Never includes `partnerMargin`. |
+| `getMine` | query | Owner only. Application + applicants + documents + timeline + payments. `partnerMargin` is stripped for the owner (the end traveller on a B2B booking); kept only for the placing partner or staff. |
+| `getByReference` | query | Owner-or-staff. For the confirmation page. Same `partnerMargin` rule as `getMine`. |
 | `cancelMine` | mutation | Owner only, and only while pre-processing. |
-| `listForAdmin` | query | Paginated + filters `{ search?, status?, paymentStatus?, destinationId?, assignedAgentId?, dateFrom?, dateTo?, sort? }`. |
-| `getForAdmin` | query | Full workspace payload. |
+| `listForAdmin` | query | Paginated + filters `{ search?, status?, paymentStatus?, destinationId?, assignedAgentId?, dateFrom?, dateTo?, sort? }`. Each row also carries `assignedAgentName` and `partnerName` (agency name for B2B bookings, else `null`). `partnerMargin` is always stripped from rows (the list never renders it). |
+| `getForAdmin` | query | Full workspace payload, plus for B2B bookings: `partner: { _id, partnerCode, agencyName, contactPersonName, contactEmail, contactPhone, businessType, city, country, status, bookingCount } \| null`, `partnerCustomer: { _id, fullName, email, phone?, reference? } \| null` (the partner's `partnerCustomers` row for the booking's customer), `commercials: { partnerMargin: <frozen snapshot> \| null } \| null`. `partner` is `null` unless the caller holds `partner:view`. `commercials` is `null` and `application.partnerMargin` is removed unless the caller holds `partner:pricing`; `partnerMargin: null` means not frozen yet. |
 | `updateStatus` | mutation | Validates against `ALLOWED_TRANSITIONS`. Audited + notifies. |
 | `bulkUpdateStatus` | mutation | Requires `application:bulk_update`. |
 | `updateTripDetails` | mutation | Requires `application:update_status`. Staff correcting travel dates, purpose, departure country and contact phone after submission. Cannot reach status, pricing or travellerCount. Audited. |

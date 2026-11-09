@@ -27,8 +27,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { DocumentStatusBadge } from "@/components/shared/status-badge";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
+import { FieldError } from "@/components/shared/form-field";
 import { formatDateTime } from "@/lib/helpers/format";
 import { PERMISSIONS } from "@/lib/constants/roles";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 /**
  * In-place document viewer for the CRM.
@@ -83,6 +86,13 @@ export function DocumentViewer({
   } | null>(null);
   const [rejectingFor, setRejectingFor] = useState<Id<"documents"> | null>(null);
   const [reason, setReason] = useState("");
+  const reasonValidation = useValidation(
+    (): FieldErrors =>
+      reason.trim().length < 3
+        ? { "rejection-reason": "Tell the customer what is wrong — they see this text." }
+        : {},
+    rejectingFor ?? "none",
+  );
   const [saving, setSaving] = useState(false);
 
   const index = documents.findIndex((d) => d._id === openId);
@@ -126,7 +136,7 @@ export function DocumentViewer({
         setResolved({
           id: documentId,
           error:
-            error instanceof Error ? error.message : "Could not open this document.",
+            friendlyError(error, "Could not open this document."),
         });
       });
 
@@ -148,10 +158,7 @@ export function DocumentViewer({
 
   async function decide(status: "approved" | "rejected") {
     if (!current) return;
-    if (status === "rejected" && reason.trim().length < 3) {
-      toast.error("Tell the customer what is wrong — they see this text.");
-      return;
-    }
+    if (status === "rejected" && !reasonValidation.check()) return;
 
     setSaving(true);
     try {
@@ -172,7 +179,7 @@ export function DocumentViewer({
       if (next) onOpenChange(next._id);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not record that decision.",
+        friendlyError(error, "Could not record that decision."),
       );
     } finally {
       setSaving(false);
@@ -280,8 +287,18 @@ export function DocumentViewer({
                   id="rejection-reason"
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
+                  aria-invalid={reasonValidation.errors["rejection-reason"] ? true : undefined}
+                  aria-describedby={
+                    reasonValidation.errors["rejection-reason"]
+                      ? "rejection-reason-error"
+                      : undefined
+                  }
                   placeholder="The customer sees this — be specific. e.g. The passport photo page is cut off at the bottom."
                   rows={2}
+                />
+                <FieldError
+                  id="rejection-reason"
+                  message={reasonValidation.errors["rejection-reason"]}
                 />
               </div>
             )}

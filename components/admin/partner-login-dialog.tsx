@@ -16,6 +16,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { FieldError } from "@/components/shared/form-field";
+import { useValidation, type FieldErrors } from "@/hooks/use-validation";
 import { Label } from "@/components/ui/label";
 
 /**
@@ -44,13 +46,26 @@ export function PartnerLoginDialog({
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const { errors, check, reset: resetValidation } = useValidation((): FieldErrors => {
+    const trimmed = customPassword.trim();
+    if (trimmed && trimmed.length < 8) {
+      return { "partner-login-password": "Use at least 8 characters, or leave it blank." };
+    }
+    if (trimmed.length > 100) {
+      return { "partner-login-password": "Keep the password under 100 characters." };
+    }
+    return {};
+  });
+
   function reset() {
+    resetValidation();
     setCustomPassword("");
     setResult(null);
     setCopied(false);
   }
 
   async function create() {
+    if (!check()) return;
     setBusy(true);
     try {
       const response = await fetch("/api/admin/partners/login", {
@@ -131,6 +146,16 @@ export function PartnerLoginDialog({
                 placeholder="Leave blank to generate a strong one"
                 autoComplete="off"
                 disabled={busy}
+                aria-invalid={errors["partner-login-password"] ? true : undefined}
+                aria-describedby={
+                  errors["partner-login-password"]
+                    ? "partner-login-password-error"
+                    : undefined
+                }
+              />
+              <FieldError
+                id="partner-login-password"
+                message={errors["partner-login-password"]}
               />
               <p className="text-xs text-muted-foreground">
                 At least 8 characters. Clerk&apos;s password policy applies.

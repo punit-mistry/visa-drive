@@ -40,6 +40,7 @@ import {
   type DocumentStatusValue,
   type PaymentStatusValue,
 } from "@/lib/constants/statuses";
+import { friendlyError } from "@/lib/helpers/error-messages";
 
 function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -62,6 +63,8 @@ export default function PartnerBookingDetailPage() {
 
   const [downloading, setDownloading] = useState<string | null>(null);
   const [uploadTarget, setUploadTarget] = useState<string | null>(null);
+  const [uploadTried, setUploadTried] = useState(false);
+  const [uploadApplicant, setUploadApplicant] = useState<string | null>(null);
 
   const upload = useDocumentUpload({ applicationId });
 
@@ -85,6 +88,14 @@ export default function PartnerBookingDetailPage() {
     (APPLICATION_STATUS_CONFIG[status]?.isTerminal ?? false) === false &&
     status !== "cancelled";
 
+  const targetRequirement = requirements.find(
+    (r) => r.documentKey === uploadTarget,
+  );
+  const needsTraveller = targetRequirement?.appliesTo === "all";
+  const effectiveApplicant = needsTraveller
+    ? (applicants.length === 1 ? applicants[0]._id : uploadApplicant)
+    : null;
+
   async function openDocument(documentId: Id<"documents">) {
     setDownloading(documentId);
     try {
@@ -96,7 +107,7 @@ export default function PartnerBookingDetailPage() {
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not open the file.",
+        friendlyError(error, "Could not open the file."),
       );
     } finally {
       setDownloading(null);
@@ -277,7 +288,11 @@ export default function PartnerBookingDetailPage() {
                     <p className="text-sm font-medium">Upload a document</p>
                     <select
                       value={uploadTarget ?? ""}
+                      id="upload-target"
                       onChange={(e) => setUploadTarget(e.target.value || null)}
+                      aria-describedby={
+                        uploadTried && !uploadTarget ? "upload-target-error" : undefined
+                      }
                       className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-brand"
                       aria-label="Which document is this?"
                     >
@@ -293,24 +308,63 @@ export default function PartnerBookingDetailPage() {
                       ))}
                     </select>
 
+                    {uploadTried && !uploadTarget && (
+                      <p id="upload-target-error" role="alert" className="text-xs text-destructive">
+                        Choose which document this is before uploading.
+                      </p>
+                    )}
+
+                    {needsTraveller && applicants.length > 1 && (
+                      <select
+                        value={uploadApplicant ?? ""}
+                        id="upload-applicant"
+                        onChange={(e) => setUploadApplicant(e.target.value || null)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-brand"
+                        aria-label="Which traveller is this for?"
+                      >
+                        <option value="">Choose the traveller…</option>
+                        {applicants.map((applicant) => (
+                          <option key={applicant._id} value={applicant._id}>
+                            {fullName(applicant)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {uploadTried && needsTraveller && !effectiveApplicant && (
+                      <p role="alert" className="text-xs text-destructive">
+                        Choose which traveller this document is for.
+                      </p>
+                    )}
+
                     <FileDropzone
                       compact
-                      disabled={!uploadTarget || upload.isUploading}
+                      disabled={upload.isUploading}
                       uploads={upload.uploads}
                       onRemove={upload.removeUpload}
                       label={
                         uploadTarget
                           ? "Drag and drop, or click to choose"
-                          : "Choose a document type first"
+                          : "Choose a document type, then add your file"
                       }
                       onFiles={(files) => {
-                        if (!uploadTarget) return;
-                        const requirement = requirements.find(
-                          (r) => r.documentKey === uploadTarget,
-                        );
+                        if (!uploadTarget) {
+                          setUploadTried(true);
+                          document.getElementById("upload-target")?.focus();
+                          return;
+                        }
+                        if (needsTraveller && !effectiveApplicant) {
+                          setUploadTried(true);
+                          document.getElementById("upload-applicant")?.focus();
+                          return;
+                        }
+                        const requirement = targetRequirement;
                         void upload.uploadMany(files, {
                           documentKey: uploadTarget,
                           label: requirement?.label ?? uploadTarget,
+                          applicantId: effectiveApplicant
+                            ? (effectiveApplicant as Id<"applicants">)
+                            : undefined,
                           constraints: requirement
                             ? {
                                 allowedMimeTypes: requirement.allowedMimeTypes,
@@ -457,9 +511,7 @@ export default function PartnerBookingDetailPage() {
                       toast.success(`${application.referenceId} cancelled.`);
                     } catch (error) {
                       toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Could not cancel the booking.",
+                        friendlyError(error, "Could not cancel the booking."),
                       );
                     }
                   }}

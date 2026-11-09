@@ -64,9 +64,8 @@ export async function POST(request: Request) {
   let parsed: z.infer<typeof bodySchema>;
   try {
     parsed = bodySchema.parse(await request.json());
-  } catch (error) {
-    const issue = (error as z.ZodError)?.issues?.[0];
-    return failure(400, issue ? `${issue.path.join(".")}: ${issue.message}` : "Invalid request.");
+  } catch {
+    return failure(400, "Please check the details and try again.");
   }
 
   const convex = new ConvexHttpClient(convexUrl);
