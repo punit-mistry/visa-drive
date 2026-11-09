@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/claude-sonnet-5-5#medium",
+  "mcp": {
+    "servers": {
+      "ai-router": {
+        "type": "local",
+        "command": ["node", "tools/ai-router-mcp/server.mjs"],
+        "codemode": false
+      }
+    }
+  }
+}

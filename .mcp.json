@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ai-router": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["tools/ai-router-mcp/server.mjs"]
+    }
+  }
+}

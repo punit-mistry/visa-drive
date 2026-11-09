@@ -43,5 +43,8 @@ next-env.d.ts
 # lint output artifact
 .eslint-report.json
 
+# ai-router decision log
+/.ai-routing/
+
 .vercel
 .env*
