@@ -11,7 +11,7 @@ import {
 } from "./_generated/server";
 import { requirePermission } from "./lib/auth";
 import { AUDIT_ACTIONS, recordAudit } from "./lib/audit";
-import { generateReference } from "./lib/references";
+import { createEnquiryCore } from "./lib/enquiryCore";
 import { NOTIFICATION_TYPES } from "../lib/constants/notifications";
 import { PERMISSIONS } from "../lib/constants/roles";
 import { LEAD_STATUS_CONFIG } from "../lib/constants/statuses";
@@ -198,52 +198,21 @@ export const submit = mutation({
       if (destination) destinationId = destination._id;
     }
 
-    const referenceId = await generateReference(ctx, "enquiry", now);
-
-    const enquiryId = await ctx.db.insert("enquiries", {
-      referenceId,
+    return await createEnquiryCore(ctx, {
       fullName,
       email,
       phone,
       destinationId,
-      interestedCountry: interestedCountry || undefined,
-      visaCategory: visaCategory || undefined,
+      interestedCountry,
+      visaCategory,
       travelDate,
       subject,
       message,
-      source: args.source ?? "website_form",
-      leadStatus: "new",
-      contactAttempts: 0,
-      createdAt: now,
-      updatedAt: now,
+      // Public and unauthenticated: only the bot (via createEnquiryCore) may
+      // stamp "whatsapp", so a caller cannot inflate that channel's counts.
+      source: args.source === undefined || args.source === "whatsapp" ? "website_form" : args.source,
+      now,
     });
-
-    // ---- tell the team ------------------------------------------------
-    // Fanned out to everyone holding `enquiry:view`, deduped per recipient so
-    // a retried form POST cannot double-notify the whole office.
-    await ctx.scheduler.runAfter(0, internal.notifications.dispatchToStaff, {
-      permission: PERMISSIONS.ENQUIRY_VIEW,
-      type: NOTIFICATION_TYPES.ENQUIRY_RECEIVED,
-      title: `New enquiry from ${fullName}`,
-      body:
-        message.length > 160 ? `${message.slice(0, 159)}…` : message,
-      link: `/admin/enquiries/${enquiryId}`,
-      dedupeKeyPrefix: `enq:${enquiryId}:staff`,
-      enquiryId,
-      emailTemplate: "enquiry_received",
-      emailData: {
-        enquiryReference: referenceId,
-        enquiryName: fullName,
-        enquiryEmail: email,
-        enquiryPhone: phone,
-        enquirySubject: subject,
-        enquiryMessage: message,
-        interestedCountry: interestedCountry || undefined,
-        link: `/admin/enquiries/${enquiryId}`,
-      },
-    });
-
-    return { enquiryId, referenceId };
   },
 });
 
@@ -586,6 +555,14 @@ export const convertToApplication = mutation({
           message: "That customer no longer exists.",
         });
       }
+    } else if (enquiry.source === "whatsapp") {
+      // The email on a WhatsApp enquiry was typed into a chat and never
+      // verified, so it must not pick an account. Staff choose one explicitly.
+      throw new ConvexError({
+        code: "USER_REQUIRED",
+        message:
+          "This enquiry came from WhatsApp, so its email is unverified. Choose the customer account explicitly.",
+      });
     } else {
       user = await ctx.db
         .query("users")

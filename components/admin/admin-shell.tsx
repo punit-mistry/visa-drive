@@ -13,6 +13,7 @@ import {
   FileText,
   LayoutDashboard,
   Menu,
+  MessageCircle,
   Settings,
   ShieldCheck,
   Users,
@@ -49,6 +50,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/applications", label: "Applications", icon: FileText, permission: PERMISSIONS.APPLICATION_VIEW_ALL },
       { href: "/admin/enquiries", label: "Enquiries", icon: ClipboardList, permission: PERMISSIONS.ENQUIRY_VIEW },
+      { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle, permission: PERMISSIONS.WHATSAPP_VIEW },
       // Conversations is hidden from the menu for now, at the client's
       // request. Nothing else is switched off: the route, its permission
       // (CONVERSATION_VIEW_ALL) and the notification deep links into

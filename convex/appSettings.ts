@@ -339,6 +339,15 @@ export const SETTINGS_DEFAULTS: Record<string, SettingDefault> = {
     label: "WhatsApp Business Cloud API",
     isPublic: false,
   },
+  "integrations.whatsappBotEnabled": {
+    key: "integrations.whatsappBotEnabled",
+    category: "integrations",
+    value: false,
+    label: "WhatsApp enquiry bot",
+    description:
+      "Lets the bot answer inbound WhatsApp messages. Also requires WHATSAPP_BOT_ENABLED=true in the Convex environment (hard kill switch).",
+    isPublic: false,
+  },
   "integrations.analyticsEnabled": {
     key: "integrations.analyticsEnabled",
     category: "integrations",

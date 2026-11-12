@@ -3,6 +3,8 @@ import { Webhook } from "svix";
 
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
+import { hmacSha256Hex, timingSafeEqual } from "./lib/crypto";
+import { normaliseWebhookDetailed } from "../lib/whatsapp/webhook";
 
 /* ============================================================================
  * HTTP endpoints.
@@ -189,47 +191,6 @@ http.route({
 /*                              Razorpay webhook                              */
 /* -------------------------------------------------------------------------- */
 
-const hexLookup = "0123456789abcdef";
-
-function toHex(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let out = "";
-  for (const byte of bytes) {
-    out += hexLookup[byte >> 4] + hexLookup[byte & 15];
-  }
-  return out;
-}
-
-/**
- * Constant-time string comparison.
- *
- * The Convex default runtime has no Node `crypto`, so there is no
- * `timingSafeEqual`. Comparing every character and OR-ing the differences
- * keeps the runtime independent of where the first mismatch is, which is what
- * stops an attacker recovering a signature byte by byte.
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i += 1) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-async function hmacSha256Hex(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
-  return toHex(signature);
-}
-
 http.route({
   path: "/razorpay-webhook",
   method: "POST",
@@ -312,6 +273,106 @@ http.route({
       console.error("[razorpay-webhook] handler failed", event.event, error);
       return new Response("Handler error", { status: 500 });
     }
+  }),
+});
+
+/* -------------------------------------------------------------------------- */
+/*                              WhatsApp webhook                              */
+/* -------------------------------------------------------------------------- */
+
+// GET: Meta's one-off subscription handshake. The verify token is compared in
+// constant time; nothing about the request is logged.
+http.route({
+  path: "/whatsapp-webhook",
+  method: "GET",
+  handler: httpAction(async (_ctx, request) => {
+    const expected = process.env.WHATSAPP_VERIFY_TOKEN;
+    if (!expected) {
+      console.error("[whatsapp-webhook] WHATSAPP_VERIFY_TOKEN is not set");
+      return new Response("Webhook not configured", { status: 503 });
+    }
+    const params = new URL(request.url).searchParams;
+    const mode = params.get("hub.mode");
+    const token = params.get("hub.verify_token") ?? "";
+    const challenge = params.get("hub.challenge");
+    if (mode === "subscribe" && challenge !== null && timingSafeEqual(token, expected)) {
+      return new Response(challenge, { status: 200, headers: { "content-type": "text/plain" } });
+    }
+    return new Response("Forbidden", { status: 403 });
+  }),
+});
+
+// POST: nothing is parsed or acted on until the HMAC of the RAW body matches
+// `x-hub-signature-256`. Verified payloads are reduced to a minimal item list
+// and handed to ONE mutation, which dedupes and schedules the real work, so
+// Meta gets its 200 immediately. Bodies, tokens and phone numbers are never
+// logged.
+http.route({
+  path: "/whatsapp-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const secret = process.env.WHATSAPP_APP_SECRET;
+    if (!secret) {
+      console.error("[whatsapp-webhook] WHATSAPP_APP_SECRET is not set");
+      return new Response("Webhook not configured", { status: 503 });
+    }
+
+    const header = request.headers.get("x-hub-signature-256");
+    if (!header || !header.startsWith("sha256=")) {
+      return new Response("Missing signature", { status: 401 });
+    }
+
+    // Sign-check the exact bytes Meta sent; decode to text only once verified.
+    const rawBody = await request.arrayBuffer();
+
+    let expected: string;
+    try {
+      expected = await hmacSha256Hex(secret, rawBody);
+    } catch {
+      console.error("[whatsapp-webhook] could not compute HMAC");
+      return new Response("Handler error", { status: 500 });
+    }
+    if (!timingSafeEqual(expected, header.slice("sha256=".length).trim().toLowerCase())) {
+      console.error("[whatsapp-webhook] signature mismatch");
+      return new Response("Invalid signature", { status: 401 });
+    }
+
+    let json: unknown;
+    try {
+      json = JSON.parse(new TextDecoder().decode(rawBody));
+    } catch {
+      return new Response("Invalid payload", { status: 400 });
+    }
+    const normalised = normaliseWebhookDetailed(json, process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || undefined);
+    if (normalised === null) {
+      return new Response("Invalid payload", { status: 400 });
+    }
+    const { items } = normalised;
+    if (items.length === 0 && normalised.foreign > 0) {
+      // Everything was addressed to another phone number id: almost certainly
+      // a wrong WHATSAPP_PHONE_NUMBER_ID. Fail loudly so Meta retries.
+      console.error(
+        `[whatsapp-webhook] all ${normalised.foreign} item(s) were for another phone number id; check WHATSAPP_PHONE_NUMBER_ID`,
+      );
+      return new Response("Handler error", { status: 500 });
+    }
+    if (normalised.skipped > 0 || normalised.truncated > 0 || normalised.foreign > 0) {
+      // Counts only — never the content.
+      console.warn(
+        `[whatsapp-webhook] skipped ${normalised.skipped} malformed, dropped ${normalised.truncated} over the 100-item cap, ignored ${normalised.foreign} for another phone number id`,
+      );
+    }
+
+    try {
+      if (items.length > 0) {
+        await ctx.runMutation(internal.whatsapp.ingestWebhook, { items });
+      }
+    } catch {
+      // 500 makes Meta retry; ingest dedupes on the wamid.
+      console.error("[whatsapp-webhook] ingest failed");
+      return new Response("Handler error", { status: 500 });
+    }
+    return new Response(null, { status: 200 });
   }),
 });
 

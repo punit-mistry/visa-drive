@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "whatsapp:env": "node tools/sync-whatsapp-env.mjs",
+    "whatsapp:setup": "node tools/sync-whatsapp-env.mjs && node tools/configure-whatsapp-meta.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.23",

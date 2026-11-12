@@ -24,10 +24,14 @@ import type * as http from "../http.js";
 import type * as internalNotes from "../internalNotes.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_crypto from "../lib/crypto.js";
 import type * as lib_destinationOrder from "../lib/destinationOrder.js";
+import type * as lib_enquiryCore from "../lib/enquiryCore.js";
 import type * as lib_messaging from "../lib/messaging.js";
 import type * as lib_partners from "../lib/partners.js";
 import type * as lib_references from "../lib/references.js";
+import type * as lib_settings from "../lib/settings.js";
+import type * as lib_whatsappOutbound from "../lib/whatsappOutbound.js";
 import type * as messages from "../messages.js";
 import type * as notifications from "../notifications.js";
 import type * as partnerBookings from "../partnerBookings.js";
@@ -43,6 +47,9 @@ import type * as users from "../users.js";
 import type * as visaFAQs from "../visaFAQs.js";
 import type * as visaProducts from "../visaProducts.js";
 import type * as visaRequirements from "../visaRequirements.js";
+import type * as whatsapp from "../whatsapp.js";
+import type * as whatsappAdmin from "../whatsappAdmin.js";
+import type * as whatsappSend from "../whatsappSend.js";
 
 import type {
   ApiFromModules,
@@ -67,10 +74,14 @@ declare const fullApi: ApiFromModules<{
   internalNotes: typeof internalNotes;
   "lib/audit": typeof lib_audit;
   "lib/auth": typeof lib_auth;
+  "lib/crypto": typeof lib_crypto;
   "lib/destinationOrder": typeof lib_destinationOrder;
+  "lib/enquiryCore": typeof lib_enquiryCore;
   "lib/messaging": typeof lib_messaging;
   "lib/partners": typeof lib_partners;
   "lib/references": typeof lib_references;
+  "lib/settings": typeof lib_settings;
+  "lib/whatsappOutbound": typeof lib_whatsappOutbound;
   messages: typeof messages;
   notifications: typeof notifications;
   partnerBookings: typeof partnerBookings;
@@ -86,6 +97,9 @@ declare const fullApi: ApiFromModules<{
   visaFAQs: typeof visaFAQs;
   visaProducts: typeof visaProducts;
   visaRequirements: typeof visaRequirements;
+  whatsapp: typeof whatsapp;
+  whatsappAdmin: typeof whatsappAdmin;
+  whatsappSend: typeof whatsappSend;
 }>;
 
 /**

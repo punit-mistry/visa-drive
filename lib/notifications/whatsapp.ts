@@ -16,8 +16,8 @@
  *    customer-service window. Outside it Meta requires a pre-approved
  *    template, which has to be registered in the WhatsApp Manager first. See
  *    `WHATSAPP_TEMPLATE_HINTS` for the per-event mapping we expect to register;
- *    until those exist, `sendWhatsApp` sends free-form text and records the
- *    API's rejection in `deliveryError` rather than failing the mutation.
+ *    until those exist, `sendWhatsApp` refuses to send outside the window and
+ *    records the refusal in `deliveryError` rather than failing the mutation.
  *  - The hard cap on a text body is 4096 characters. We clamp well below it.
  */
 
@@ -504,7 +504,7 @@ export const WHATSAPP_BUILDERS: Record<string, (data: WhatsAppData) => string> =
  * The pre-approved WhatsApp template names we expect to register in Meta's
  * WhatsApp Manager, one per event that can fall outside the 24-hour window.
  * Registering them is an operations task, not a code change — until then
- * `sendWhatsApp` falls back to free-form text.
+ * `sendWhatsApp` refuses free-form text outside the 24-hour window.
  */
 export const WHATSAPP_TEMPLATE_HINTS: Record<string, string> = {
   "booking.submitted": "visadrive_booking_submitted",

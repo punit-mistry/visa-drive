@@ -145,6 +145,10 @@ export const PERMISSIONS = {
   PARTNER_PRICING: "partner:pricing",
   PARTNER_EXPORT: "partner:export",
 
+  // WhatsApp bot inbox + settings
+  WHATSAPP_VIEW: "whatsapp:view",
+  WHATSAPP_MANAGE: "whatsapp:manage",
+
   // Staff & settings
   STAFF_VIEW: "staff:view",
   STAFF_MANAGE: "staff:manage",
@@ -175,6 +179,8 @@ const SUPPORT_AGENT_PERMISSIONS: Permission[] = [
   // Reading the partner directory is part of answering "who booked this?" on
   // the phone. Approving one, or changing what they pay, is not.
   P.PARTNER_VIEW,
+  // Read the WhatsApp inbox. Replying uses conversation:reply.
+  P.WHATSAPP_VIEW,
 ];
 
 const VISA_AGENT_PERMISSIONS: Permission[] = [
@@ -205,6 +211,8 @@ const MANAGER_PERMISSIONS: Permission[] = [
   P.PAYMENT_EXPORT,
   P.PARTNER_MANAGE,
   P.PARTNER_EXPORT,
+  // Bot kill switch, demo reset.
+  P.WHATSAPP_MANAGE,
   P.STAFF_VIEW,
   P.SETTINGS_VIEW,
 ];

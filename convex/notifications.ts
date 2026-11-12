@@ -15,6 +15,7 @@ import {
 } from "../lib/constants/notifications";
 import { resolvePermissions, STAFF_ROLES } from "../lib/constants/roles";
 import { renderEmail } from "../lib/notifications/templates";
+import { checkSendPolicy, readWhatsAppEnv } from "../lib/whatsapp/policy";
 import {
   buildWhatsAppBody,
   normaliseWhatsAppNumber,
@@ -555,7 +556,12 @@ export const sendEmail = internalAction({
 /*                                 WhatsApp                                   */
 /* -------------------------------------------------------------------------- */
 
-const WHATSAPP_API_VERSION = "v21.0";
+
+/** Last four digits only, for logs. */
+function maskNumber(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return digits.length > 4 ? `***${digits.slice(-4)}` : "***";
+}
 
 /**
  * Send one WhatsApp message through the WhatsApp Business Cloud API.
@@ -583,7 +589,7 @@ export const sendWhatsApp = internalAction({
   returns: v.object({ delivered: v.boolean(), reason: v.optional(v.string()) }),
   handler: async (ctx, args) => {
     const token = process.env.WHATSAPP_ACCESS_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
 
     const to = normaliseWhatsAppNumber(args.to);
 
@@ -599,7 +605,7 @@ export const sendWhatsApp = internalAction({
 
     if (!token || !phoneNumberId) {
       console.log(
-        `[notifications] whatsapp skipped (WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID unset) to=${args.to} type=${args.notificationType}`,
+        `[notifications] whatsapp skipped (WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID unset) to=${maskNumber(args.to)} type=${args.notificationType}`,
       );
       await record(false, "WhatsApp credentials unset");
       return { delivered: false, reason: "WhatsApp credentials unset" };
@@ -607,10 +613,32 @@ export const sendWhatsApp = internalAction({
 
     if (!to) {
       console.warn(
-        `[notifications] whatsapp skipped: "${args.to}" is not a usable number`,
+        `[notifications] whatsapp skipped: ${maskNumber(args.to)} is not a usable number`,
       );
       await record(false, "unusable phone number");
       return { delivered: false, reason: "unusable phone number" };
+    }
+
+    // The same gates the bot's send path enforces: STOP, the demo allow-list
+    // and the 24-hour window. This path always sends free-form text
+    // (`type: "text"`), never a template, so the window always applies. A
+    // number with no WhatsApp contact row has no inbound message on record,
+    // which means its window is closed and the send must be refused.
+    const contact = await ctx.runQuery(internal.whatsappSend.loadContactByWaId, { waId: to });
+    const decision = checkSendPolicy({
+      waId: to,
+      optedOut: contact?.optedOut ?? false,
+      lastInboundAt: contact?.lastInboundAt,
+      now: Date.now(),
+      env: readWhatsAppEnv(process.env),
+      usingTemplate: false,
+    });
+    if (!decision.ok) {
+      console.log(
+        `[notifications] whatsapp refused (${decision.code}) to=${maskNumber(to)} type=${args.notificationType}`,
+      );
+      await record(false, decision.message);
+      return { delivered: false, reason: decision.message };
     }
 
     const messageBody = buildWhatsAppBody(args.notificationType, {
@@ -626,7 +654,7 @@ export const sendWhatsApp = internalAction({
 
     try {
       const response = await fetch(
-        `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`,
+        `https://graph.facebook.com/${readWhatsAppEnv(process.env).graphVersion}/${phoneNumberId}/messages`,
         {
           method: "POST",
           headers: {

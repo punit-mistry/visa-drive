@@ -303,12 +303,55 @@ deployment), `reset`, `status`. Seeds the six destinations, their visa
 products, requirements, FAQs, plus demo customers/applications/payments/
 conversations — all flagged `isDemoContent: true`.
 
+## `convex/whatsapp.ts` (internal only)
+
+`ingestWebhook` (dedupes each batch item on `whatsappWebhookEvents.by_dedupeKey`,
+schedules the two below), `processMessage` (contact + conversation + inbound
+row + STOP/START, always; schedules `runBot` when the bot may answer),
+`runBot` (action; wraps `applyBotStep`, marks the event failed on error),
+`applyBotStep` (bot step + effects + replies + event "done" in one transaction,
+so a retry cannot reply twice), `markBotFailed`, `processStatus` (monotonic
+delivery receipts; a receipt for an unknown wamid is re-checked once after 30s),
+`sweepStuckEvents` (cron every 10 min, see `convex/crons.ts`: inbound events
+still "pending" after 10 minutes, looking back one day, are marked failed and the
+conversation is escalated to staff once: high priority, handoff flag, one
+notification with dedupe key `wa:botfail:<eventId>`). `markBotFailed` escalates the
+same way. `WHATSAPP_DEMO_MODE=true` suppresses all WhatsApp notifications to
+non-allow-listed numbers app-wide, so it must never be on in production.
+
+## `convex/whatsappSend.ts` (internal only)
+
+`sendOutbound` (action; sends already-inserted rows in order, enforces opt-out /
+demo allow-list / 24h window, retries 429/5xx/network at 1m, 5m, 30m, max 4
+attempts), `loadContactForSend`, `loadContactByWaId` (used by `notifications.sendWhatsApp`
+to apply the same STOP / demo / window gates), `recordSendResult`.
+
+## `convex/whatsappAdmin.ts`
+
+| Function | Kind | Permission |
+| --- | --- | --- |
+| `listConversations` | query | `whatsapp:view` |
+| `getConversation` | query | `whatsapp:view` (includes internal notes) |
+| `getStatus` | query | `whatsapp:view` (booleans and counts only, no secrets) |
+| `sendReply` | mutation | `conversation:reply`; refuses OPTED_OUT / DEMO_RECIPIENT_BLOCKED / WINDOW_CLOSED; audited |
+| `assign` | mutation | `conversation:assign`; audited |
+| `setHandoff`, `resumeBot` | mutation | `conversation:reply`; audited |
+| `setBotEnabled` | mutation | `whatsapp:manage`; audited |
+| `resetDemo` | mutation | `whatsapp:manage`; demo mode only, `isDemo` rows only; audited |
+
+Shared helpers: `convex/lib/crypto.ts` (HMAC + constant-time compare),
+`convex/lib/enquiryCore.ts` (`createEnquiryCore`, used by `enquiries.submit`
+and the bot), `convex/lib/whatsappOutbound.ts`, `convex/lib/settings.ts`.
+New setting: `integrations.whatsappBotEnabled` (private, default false).
+
 ## `convex/http.ts`
 
 | Route | Purpose |
 | --- | --- |
 | `POST /clerk-webhook` | Svix-verified. → `users.upsertFromClerk` / `deleteFromClerk`. |
 | `POST /razorpay-webhook` | HMAC-verified. → `payments.handleWebhookEvent`. |
+| `GET /whatsapp-webhook` | Meta verification handshake (`WHATSAPP_VERIFY_TOKEN`, constant-time). 403 on mismatch, 503 if unset. |
+| `POST /whatsapp-webhook` | `x-hub-signature-256` HMAC of the raw body (`WHATSAPP_APP_SECRET`); 401 bad/missing, 503 if unset, 400 bad payload. → `whatsapp.ingestWebhook`. |
 | `GET /health` | Liveness. |
 
 ## `convex/crons.ts`

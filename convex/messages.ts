@@ -138,6 +138,13 @@ export const send = mutation({
     // see every conversation, but replying needs `conversation:reply`.
     if (viaStaff) {
       await requirePermission(ctx, PERMISSIONS.CONVERSATION_REPLY);
+      // A row here would look sent but never reach WhatsApp.
+      if (conversation.channel === "whatsapp") {
+        throw new ConvexError({
+          code: "WHATSAPP_THREAD",
+          message: "This is a WhatsApp conversation. Reply with whatsappAdmin.sendReply.",
+        });
+      }
     }
 
     if (conversation.status === "closed" && !viaStaff) {

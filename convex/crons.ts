@@ -43,6 +43,10 @@ const sweepAbandonedDrafts = makeFunctionReference<"mutation", NoArgs>(
   "admin:sweepAbandonedDrafts",
 );
 
+const sweepStuckWhatsAppEvents = makeFunctionReference<"mutation", NoArgs>(
+  "whatsapp:sweepStuckEvents",
+);
+
 const crons = cronJobs();
 
 // 09:00 IST — on the agent's desk as the day starts.
@@ -69,5 +73,8 @@ crons.hourly(
   sweepAbandonedDrafts,
   {},
 );
+
+// WhatsApp inbound events that never finished (lost job): fail them and alert staff.
+crons.interval("whatsapp stuck events", { minutes: 10 }, sweepStuckWhatsAppEvents, {});
 
 export default crons;

@@ -906,6 +906,11 @@ export default defineSchema({
     convertedApplicationId: v.optional(v.id("applications")),
     convertedAt: v.optional(v.number()),
 
+    /** Set when the enquiry was captured by the WhatsApp bot. */
+    whatsappContactId: v.optional(v.id("whatsappContacts")),
+    /** Created from demo/sample traffic; excluded from real statistics. */
+    isDemo: v.optional(v.boolean()),
+
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -917,6 +922,8 @@ export default defineSchema({
     .index("by_leadStatus_createdAt", ["leadStatus", "createdAt"])
     .index("by_followUpAt", ["followUpAt"])
     .index("by_destinationId", ["destinationId"])
+    .index("by_whatsappContactId", ["whatsappContactId"])
+    .index("by_source_createdAt", ["source", "createdAt"])
     .searchIndex("search_enquiries", {
       searchField: "fullName",
       filterFields: ["leadStatus", "assignedTo"],
@@ -927,9 +934,12 @@ export default defineSchema({
     subject: v.string(),
     userId: v.optional(v.id("users")), // absent for guest/enquiry threads
     customerName: v.string(),
+    /** Required by the schema; use "" when unknown (WhatsApp threads). */
     customerEmail: v.string(),
     applicationId: v.optional(v.id("applications")),
     enquiryId: v.optional(v.id("enquiries")),
+    /** WhatsApp bot contact this thread belongs to (no users row is created). */
+    whatsappContactId: v.optional(v.id("whatsappContacts")),
 
     status: conversationStatus,
     priority: v.union(v.literal("low"), v.literal("normal"), v.literal("high"), v.literal("urgent")),
@@ -953,7 +963,67 @@ export default defineSchema({
     .index("by_status_lastMessage", ["status", "lastMessageAt"])
     .index("by_assignedTo", ["assignedTo"])
     .index("by_lastMessageAt", ["lastMessageAt"])
-    .index("by_enquiryId", ["enquiryId"]),
+    .index("by_enquiryId", ["enquiryId"])
+    .index("by_whatsappContactId", ["whatsappContactId"])
+    .index("by_channel_lastMessage", ["channel", "lastMessageAt"])
+    .index("by_channel_status_lastMessage", ["channel", "status", "lastMessageAt"])
+    .index("by_channel_assignedTo", ["channel", "assignedTo", "lastMessageAt"]),
+
+  /* ------------------------------------------------------ whatsappContacts */
+  /**
+   * One row per WhatsApp number that has messaged the bot. Not a user account.
+   * `linkedUserId` is informational only and NEVER grants access to data.
+   *
+   * Convex has no unique constraints: `by_waId` is unique by convention only.
+   * Ingest must look up by waId and insert inside ONE mutation so concurrent
+   * webhooks serialise and cannot create duplicates.
+   */
+  whatsappContacts: defineTable({
+    waId: v.string(), // digits only, no "+"
+    profileName: v.optional(v.string()), // WhatsApp profile name
+    displayName: v.optional(v.string()), // name captured by the bot
+    linkedUserId: v.optional(v.id("users")),
+    lastInboundAt: v.optional(v.number()),
+    optedOut: v.boolean(),
+    botState: v.string(), // current step id
+    botData: v.object({
+      destinationSlug: v.optional(v.string()),
+      destinationName: v.optional(v.string()),
+      category: v.optional(v.string()),
+      duration: v.optional(v.string()),
+      travelDate: v.optional(v.number()),
+      travellers: v.optional(v.number()),
+      fullName: v.optional(v.string()),
+      email: v.optional(v.string()),
+    }),
+    stateHistory: v.array(v.string()), // step ids, for "back"
+    humanHandoff: v.boolean(),
+    isDemo: v.boolean(),
+    language: v.string(), // default "en"
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_waId", ["waId"])
+    .index("by_lastInboundAt", ["lastInboundAt"])
+    .index("by_isDemo", ["isDemo"]),
+
+  /* ------------------------------------------------- whatsappWebhookEvents */
+  /** Idempotency ledger for Meta webhooks. Never store tokens or bodies here. */
+  whatsappWebhookEvents: defineTable({
+    dedupeKey: v.string(),
+    kind: v.union(v.literal("message"), v.literal("status")),
+    waMessageId: v.optional(v.string()),
+    status: v.optional(v.string()),
+    receivedAt: v.number(),
+    processedAt: v.optional(v.number()),
+    processingState: v.union(v.literal("pending"), v.literal("done"), v.literal("failed")),
+    attempts: v.number(),
+    /** Must not contain tokens or message bodies. */
+    lastError: v.optional(v.string()),
+  })
+    .index("by_dedupeKey", ["dedupeKey"])
+    .index("by_receivedAt", ["receivedAt"])
+    .index("by_state_receivedAt", ["processingState", "receivedAt"]),
 
   /* ------------------------------------------------------------- messages */
   messages: defineTable({
@@ -971,8 +1041,17 @@ export default defineSchema({
     isInternal: v.boolean(),
     readByCustomerAt: v.optional(v.number()),
     readByStaffAt: v.optional(v.number()),
+    /** WhatsApp fields (wamid, direction, delivery receipt, payload kind). */
+    externalId: v.optional(v.string()),
+    direction: v.optional(v.union(v.literal("inbound"), v.literal("outbound"))),
+    deliveryStatus: v.optional(
+      v.union(v.literal("sent"), v.literal("delivered"), v.literal("read"), v.literal("failed")),
+    ),
+    deliveryError: v.optional(v.string()),
+    messageType: v.optional(v.string()), // "text" | "image" | "interactive" ...
     createdAt: v.number(),
   })
+    .index("by_externalId", ["externalId"])
     .index("by_conversationId", ["conversationId"])
     .index("by_conversation_created", ["conversationId", "createdAt"])
     .index("by_conversation_internal", ["conversationId", "isInternal"])

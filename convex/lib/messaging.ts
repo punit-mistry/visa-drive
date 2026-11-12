@@ -40,6 +40,11 @@ export interface AppendMessageInput {
   authorRole: MessageAuthorRole;
   body: string;
   attachments?: Doc<"messages">["attachments"];
+  /** WhatsApp-only metadata; absent for portal messages. */
+  externalId?: string;
+  direction?: Doc<"messages">["direction"];
+  deliveryStatus?: Doc<"messages">["deliveryStatus"];
+  messageType?: string;
 }
 
 /**
@@ -64,6 +69,10 @@ export async function appendMessage(
     body: input.body,
     attachments: input.attachments ?? [],
     isInternal: false,
+    externalId: input.externalId,
+    direction: input.direction,
+    deliveryStatus: input.deliveryStatus,
+    messageType: input.messageType,
     // The author has, by definition, read their own message.
     readByCustomerAt: input.authorRole === "customer" ? now : undefined,
     readByStaffAt: input.authorRole === "staff" ? now : undefined,
